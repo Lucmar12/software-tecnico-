@@ -6,13 +6,12 @@ import { trovaAddolcitoriConsigliati } from "../data/catalogo.js";
  * Dimensionamento dell'addolcitore a scambio ionico (UNI EN 14743): volume
  * di resina necessario a coprire il fabbisogno di acqua addolcita per
  * l'autonomia target tra due rigenerazioni. Il pannello "Dettaglio
- * calcolo" è aperto di default in modalità Ingegnere, collassato in
- * modalità Venditore.
+ * calcolo" è aperto di default.
  */
-export default function AddolcitoreDettaglio({ trattamentoAcque, modalita }) {
+export default function AddolcitoreDettaglio({ trattamentoAcque }) {
   const risultato = calcolaAddolcitore(trattamentoAcque);
   const { consigliati, messaggio } = trovaAddolcitoriConsigliati(risultato.volumeResinaRichiestoLitri, risultato.portataPuntaMc);
-  const [aperto, setAperto] = useState(modalita === "ingegnere");
+  const [aperto, setAperto] = useState(true);
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">

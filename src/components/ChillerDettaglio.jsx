@@ -3,7 +3,7 @@ import CatalogoTabella from "./CatalogoTabella.jsx";
 import { calcolaDimensionamentoChiller } from "../utils/chiller.js";
 import { formattaKw } from "../utils/export.js";
 
-/** Dettaglio del dimensionamento di un impianto centralizzato a chiller con distribuzione ad acqua, derating per temperatura esterna di progetto e catalogo tecnico dedicato. In modalità compatta (Venditore) mostra solo l'esito finale, senza i passaggi tecnici intermedi. */
+/** Dettaglio del dimensionamento di un impianto centralizzato a chiller con distribuzione ad acqua, derating per temperatura esterna di progetto e catalogo tecnico dedicato. Con `compatto` mostra solo l'esito finale, senza i passaggi tecnici intermedi. */
 export default function ChillerDettaglio({ risultatiAmbienti, sistemaCentralizzato, comune, mostraCatalogo = true, compatto = false }) {
   if (sistemaCentralizzato.tipo !== "chiller" || risultatiAmbienti.length < 2) return null;
   const d = calcolaDimensionamentoChiller(risultatiAmbienti, sistemaCentralizzato, comune?.teInv);

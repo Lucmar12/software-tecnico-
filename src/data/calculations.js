@@ -359,8 +359,7 @@ export function confrontaClassiEnergetiche(kwFabbisogno, oreFunzionamento, modal
 /**
  * Calcola il riepilogo tecnico completo di un ambiente: carico invernale,
  * carico estivo, scomposizione delle dispersioni e taglia commerciale
- * suggerita. Punto di ingresso unico usato sia dalla modalità Ingegnere
- * che dalla modalità Venditore (stesso motore di calcolo).
+ * suggerita.
  */
 export function calcolaAmbiente(ambiente, comune) {
   const epoca = ambiente.epocaCostruttiva;

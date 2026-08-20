@@ -8,12 +8,10 @@ const inputCls = "mt-1 w-full border border-slate-300 rounded-lg px-2.5 py-1.5 t
  * autoclave (sempre richiesta — portata di punta e prevalenza dalla
  * pressione residua minima UNI 9182), pompa di sollevamento e pompa di
  * circolazione (ricircolo ACS), entrambe attivabili solo se presenti
- * nell'impianto. In modalità Venditore i parametri di dettaglio (perdite
- * di carico, pressione residua) restano ai valori convenzionali di
- * default; in modalità Ingegnere sono tutti sovrascrivibili.
+ * nell'impianto. Tutti i coefficienti di dettaglio (perdite di carico,
+ * pressione residua) sono espliciti e sovrascrivibili.
  */
-export default function PompeIdraulicheForm({ pompeIdrauliche, onChange, modalita }) {
-  const isIngegnere = modalita === "ingegnere";
+export default function PompeIdraulicheForm({ pompeIdrauliche, onChange }) {
   const autoclave = pompeIdrauliche.autoclave;
   const sollevamento = pompeIdrauliche.sollevamento;
   const circolazione = pompeIdrauliche.circolazione;
@@ -46,15 +44,7 @@ export default function PompeIdraulicheForm({ pompeIdrauliche, onChange, modalit
             />
           </label>
         </div>
-        {!isIngegnere && (
-          <p className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-lg p-3">
-            Pressione residua minima ({PRESSIONE_RESIDUA_MINIMA_BAR_DEFAULT} bar, UNI 9182) e perdite di carico rete
-            ({PERDITE_CARICO_PCT_DEFAULT}%) calcolate con valori convenzionali di default — modificabili passando
-            alla modalità Ingegnere.
-          </p>
-        )}
-        {isIngegnere && (
-          <div className="grid sm:grid-cols-3 gap-3 bg-slate-50 border border-slate-200 rounded-lg p-3">
+        <div className="grid sm:grid-cols-3 gap-3 bg-slate-50 border border-slate-200 rounded-lg p-3">
             <label className="block">
               <span className="text-xs font-medium text-slate-500">Pressione residua minima [bar]</span>
               <input
@@ -87,8 +77,7 @@ export default function PompeIdraulicheForm({ pompeIdrauliche, onChange, modalit
                 onChange={(e) => onChange({ ...pompeIdrauliche, autoclave: { ...autoclave, consumoLitriPersonaGiorno: Number(e.target.value) } })}
               />
             </label>
-          </div>
-        )}
+        </div>
       </div>
 
       <ToggleSezione

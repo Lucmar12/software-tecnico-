@@ -2,9 +2,9 @@ import React, { useEffect, useState } from "react";
 
 /**
  * Pulsante flottante "Richiedi preventivo", sempre raggiungibile in un
- * tap in modalità Venditore/Installatore: rimane visibile durante lo
- * scroll e porta direttamente al form di richiesta. Si nasconde quando
- * il form è già a schermo (per non coprirlo) e in fase di stampa.
+ * tap: rimane visibile durante lo scroll e porta direttamente al form di
+ * richiesta. Si nasconde quando il form è già a schermo (per non
+ * coprirlo) e in fase di stampa.
  */
 export default function FloatingCTA() {
   const [visibile, setVisibile] = useState(true);

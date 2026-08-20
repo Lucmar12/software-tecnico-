@@ -2,9 +2,9 @@ import React, { useState } from "react";
 import { nuovoScenario, cloneScenario } from "../utils/modelli.js";
 
 /**
- * Gestione di più scenari a confronto sullo stesso edificio (solo
- * modalità Ingegnere) — es. "stato di fatto" vs. "post-riqualificazione
- * con cappotto": stessi ambienti, epoche costruttive/trasmittanze diverse.
+ * Gestione di più scenari a confronto sullo stesso edificio — es. "stato
+ * di fatto" vs. "post-riqualificazione con cappotto": stessi ambienti,
+ * epoche costruttive/trasmittanze diverse.
  */
 export default function ScenariTabs({ scenari, scenarioAttivoId, onCambiaScenario, onAggiornaScenari }) {
   const [nuovoNome, setNuovoNome] = useState("");

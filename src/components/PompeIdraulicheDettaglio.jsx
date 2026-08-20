@@ -1,20 +1,19 @@
 import React, { useState } from "react";
 import { calcolaAutoclave, calcolaSollevamento, calcolaCircolazione, kwToCv, PRESSIONE_RESIDUA_MINIMA_BAR_DEFAULT } from "../utils/pompeIdrauliche.js";
+import { trovaPompeConsigliate } from "../data/catalogo.js";
 
 /** Formatta la potenza del motore [kW, valore primario] con il CV tra parentesi come valore secondario — taglia commerciale corrente per le elettropompe. */
 function formattaPotenzaMotore(potenzaKw) {
   return `${potenzaKw} kW (${kwToCv(potenzaKw).toFixed(2)} CV)`;
 }
-import { trovaPompeConsigliate } from "../data/catalogo.js";
 
 /**
  * Dimensionamento delle pompe idrauliche domestiche (UNI 9182): autoclave
  * (sempre presente), pompa di sollevamento e pompa di circolazione per il
  * ricircolo ACS, quando attivate. Ogni sotto-sezione ha un proprio
- * pannello "Dettaglio calcolo", aperto di default in modalità Ingegnere e
- * collassato in modalità Venditore.
+ * pannello "Dettaglio calcolo", aperto di default.
  */
-export default function PompeIdraulicheDettaglio({ pompeIdrauliche, modalita }) {
+export default function PompeIdraulicheDettaglio({ pompeIdrauliche }) {
   const autoclave = calcolaAutoclave(pompeIdrauliche.autoclave);
   const risultatoAutoclave = trovaPompeConsigliate("autoclave", autoclave.portataPuntaMc, autoclave.prevalenzaM);
 
@@ -30,7 +29,7 @@ export default function PompeIdraulicheDettaglio({ pompeIdrauliche, modalita }) 
     <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-4">
       <h3 className="font-semibold text-slate-800">Dimensionamento pompe idrauliche</h3>
 
-      <SottoSezione titolo="Autoclave (gruppo di pressurizzazione)" modalita={modalita}>
+      <SottoSezione titolo="Autoclave (gruppo di pressurizzazione)">
         <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
           <Riga label="Portata di punta stimata" value={`${autoclave.portataPuntaMc.toFixed(2)} m³/h`} />
           <Riga label="Altezza geodetica" value={`${autoclave.altezzaGeodeticaM.toFixed(1)} m`} />
@@ -46,7 +45,7 @@ export default function PompeIdraulicheDettaglio({ pompeIdrauliche, modalita }) 
       </SottoSezione>
 
       {sollevamentoAttivo && (
-        <SottoSezione titolo="Pompa di sollevamento" modalita={modalita}>
+        <SottoSezione titolo="Pompa di sollevamento">
           <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
             <Riga label="Dislivello geodetico" value={`${pompeIdrauliche.sollevamento.dislivelloM} m`} />
             <Riga label="Portata richiesta" value={`${sollevamento.portataMc.toFixed(2)} m³/h`} />
@@ -57,7 +56,7 @@ export default function PompeIdraulicheDettaglio({ pompeIdrauliche, modalita }) 
       )}
 
       {circolazioneAttiva && (
-        <SottoSezione titolo="Pompa di circolazione (ricircolo ACS)" modalita={modalita}>
+        <SottoSezione titolo="Pompa di circolazione (ricircolo ACS)">
           <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
             <Riga label="Lunghezza tubazioni ricircolo" value={`${pompeIdrauliche.circolazione.lunghezzaTubazioniM} m`} />
             <Riga label="Dispersione termica stimata" value={`${circolazione.dispersioneTotaleW.toFixed(0)} W`} />
@@ -71,8 +70,8 @@ export default function PompeIdraulicheDettaglio({ pompeIdrauliche, modalita }) 
   );
 }
 
-function SottoSezione({ titolo, modalita, children }) {
-  const [aperto, setAperto] = useState(modalita === "ingegnere");
+function SottoSezione({ titolo, children }) {
+  const [aperto, setAperto] = useState(true);
   return (
     <div className="border border-slate-200 rounded-lg overflow-hidden">
       <button

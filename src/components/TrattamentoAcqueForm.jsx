@@ -10,15 +10,11 @@ const inputCls = "mt-1 w-full border border-slate-300 rounded-lg px-2.5 py-1.5 t
 
 /**
  * Input per il dimensionamento dell'addolcitore a scambio ionico: durezza
- * dell'acqua in ingresso (°fH), numero persone/consumo idrico e durezza
- * residua obiettivo. In modalità Venditore la durezza in ingresso, il
- * consumo pro capite e l'autonomia tra rigenerazioni restano ai valori
- * convenzionali di default (dichiarati come stima); in modalità Ingegnere
- * sono tutti sovrascrivibili.
+ * dell'acqua in ingresso (°fH), numero persone/consumo idrico, durezza
+ * residua obiettivo e autonomia tra rigenerazioni — tutti i coefficienti
+ * sono espliciti e sovrascrivibili.
  */
-export default function TrattamentoAcqueForm({ trattamentoAcque, onChange, modalita }) {
-  const isIngegnere = modalita === "ingegnere";
-
+export default function TrattamentoAcqueForm({ trattamentoAcque, onChange }) {
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
       <h3 className="font-semibold text-slate-800">Trattamento acque — addolcitore</h3>
@@ -42,21 +38,11 @@ export default function TrattamentoAcqueForm({ trattamentoAcque, onChange, modal
             value={trattamentoAcque.durezzaIngressoGf ?? DUREZZA_INGRESSO_DEFAULT_GF}
             onChange={(e) => onChange({ ...trattamentoAcque, durezzaIngressoGf: Number(e.target.value) })}
           />
-          <span className="text-[11px] text-slate-400">
-            {isIngegnere ? "Da analisi puntuale o dato del gestore idrico — default indicativo Umbria" : `Default ${DUREZZA_INGRESSO_DEFAULT_GF} °fH (stima media Umbria) — da verificare`}
-          </span>
+          <span className="text-[11px] text-slate-400">Da analisi puntuale o dato del gestore idrico — default indicativo Umbria</span>
         </label>
       </div>
 
-      {!isIngegnere && (
-        <p className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-lg p-3">
-          Consumo idrico pro capite ({CONSUMO_LITRI_PERSONA_GIORNO_DEFAULT} l/persona/giorno), durezza residua
-          obiettivo ({DUREZZA_RESIDUA_DEFAULT_GF} °fH) e autonomia tra rigenerazioni ({AUTONOMIA_GIORNI_DEFAULT} giorni)
-          calcolati con valori convenzionali di default — modificabili passando alla modalità Ingegnere.
-        </p>
-      )}
-      {isIngegnere && (
-        <div className="grid sm:grid-cols-3 gap-3 bg-slate-50 border border-slate-200 rounded-lg p-3">
+      <div className="grid sm:grid-cols-3 gap-3 bg-slate-50 border border-slate-200 rounded-lg p-3">
           <label className="block">
             <span className="text-xs font-medium text-slate-500">Durezza residua obiettivo [°fH]</span>
             <input
@@ -88,7 +74,6 @@ export default function TrattamentoAcqueForm({ trattamentoAcque, onChange, modal
             />
           </label>
         </div>
-      )}
     </div>
   );
 }

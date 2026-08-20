@@ -3,7 +3,7 @@ import CatalogoTabella from "./CatalogoTabella.jsx";
 import { calcolaDimensionamentoVRF } from "../utils/vrf.js";
 import { formattaKw } from "../utils/export.js";
 
-/** Dettaglio del dimensionamento di un sistema VRF/multi-split centralizzato, con derating per tubazioni/dislivello, derating per temperatura esterna di progetto e catalogo tecnico dedicato. In modalità compatta (Venditore) mostra solo l'esito finale, senza i passaggi tecnici intermedi. */
+/** Dettaglio del dimensionamento di un sistema VRF/multi-split centralizzato, con derating per tubazioni/dislivello, derating per temperatura esterna di progetto e catalogo tecnico dedicato. Con `compatto` mostra solo l'esito finale, senza i passaggi tecnici intermedi. */
 export default function VRFDettaglio({ risultatiAmbienti, sistemaCentralizzato, comune, mostraCatalogo = true, compatto = false }) {
   if (sistemaCentralizzato.tipo !== "vrf" || risultatiAmbienti.length < 2) return null;
   const d = calcolaDimensionamentoVRF(risultatiAmbienti, sistemaCentralizzato, comune?.teInv);

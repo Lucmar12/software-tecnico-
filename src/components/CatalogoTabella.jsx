@@ -3,9 +3,9 @@ import { trovaProdottiConsigliati } from "../data/catalogo.js";
 import { formattaEuro } from "../utils/export.js";
 
 /**
- * Catalogo prodotti come tabella tecnica comparativa (modalità
- * Ingegnere): potenza, SCOP/SEER, classe energetica in primo piano; il
- * prezzo resta presente ma non è l'elemento guida della scelta.
+ * Catalogo prodotti come tabella tecnica comparativa: potenza, SCOP/SEER,
+ * classe energetica in primo piano; il prezzo resta presente ma non è
+ * l'elemento guida della scelta.
  */
 export default function CatalogoTabella({ fabbisognoKw, tipo = "climatizzatore_split", titolo, numeroUnitaRichieste = null }) {
   const { consigliati, messaggio } = trovaProdottiConsigliati(fabbisognoKw, tipo, numeroUnitaRichieste);

@@ -7,9 +7,8 @@ import { formattaEuro } from "../utils/export.js";
  * confronto tra alternative) — lo scopo è portare chi legge dritto alla
  * scelta di un prodotto preciso, non offrire un'ulteriore comparazione.
  * Il dettaglio di calcolo e le alternative restano disponibili più sotto,
- * per chi vuole approfondire. Mostrato sia in modalità Ingegnere (subito
- * dopo l'intestazione, prima dei dettagli tecnici) sia in modalità
- * Venditore (in cima ai risultati).
+ * per chi vuole approfondire. Mostrato subito dopo l'intestazione, prima
+ * di ogni dettaglio tecnico.
  *
  * @param {Array<{chiave: string, icona: string, titolo: string, prodotto: object|null, specifica: string, messaggio: string|null}>} voci
  */

@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Header from "./components/Header.jsx";
-import ModeSelector from "./components/ModeSelector.jsx";
 import TipoImpiantoSelector from "./components/TipoImpiantoSelector.jsx";
 import ComuneSelector from "./components/ComuneSelector.jsx";
 import ScenariTabs from "./components/ScenariTabs.jsx";
@@ -9,7 +8,6 @@ import ACSForm from "./components/ACSForm.jsx";
 import TrattamentoAcqueForm from "./components/TrattamentoAcqueForm.jsx";
 import PompeIdraulicheForm from "./components/PompeIdraulicheForm.jsx";
 import RelazioneCalcolo from "./components/RelazioneCalcolo.jsx";
-import PreventivoView from "./components/PreventivoView.jsx";
 import FloatingCTA from "./components/FloatingCTA.jsx";
 import SistemaCentralizzatoPanel from "./components/SistemaCentralizzatoPanel.jsx";
 import SolareTermicoPanel from "./components/SolareTermicoPanel.jsx";
@@ -25,7 +23,6 @@ import { FATTORE_CONTEMPORANEITA_DEFAULT } from "./utils/vrf.js";
 import { caricaBozza, salvaBozza } from "./utils/persistenza.js";
 
 const STATO_INIZIALE = {
-  modalita: null,
   tipiImpianto: { climatizzazione: true, acs: true, trattamentoAcque: false, pompeIdrauliche: false },
   comune: null,
   scenari: [nuovoScenario("Stato di fatto")],
@@ -73,12 +70,12 @@ function fondiConDefault(statoCaricato) {
 }
 
 /**
- * Componente radice dell'applicazione di dimensionamento impianti di
- * climatizzazione residenziale. Il motore di calcolo (data/comuni.js,
- * data/calculations.js, data/catalogo.js) è unico e condiviso fra le due
- * modalità d'uso; cambia solo la profondità dell'input e lo scopo
- * dell'output (consulenza tecnica vs. preventivo commerciale). Il
- * passaggio fra modalità non comporta perdita dei dati inseriti.
+ * Componente radice dell'applicazione di dimensionamento impianti
+ * residenziali. Il motore di calcolo (data/comuni.js, data/calculations.js,
+ * data/catalogo.js) è unico e condiviso da tutte le categorie; l'input è
+ * sempre completo e granulare (nessuna modalità semplificata) e l'output è
+ * sempre la relazione di calcolo integrale, con il form di richiesta
+ * preventivo in primo piano.
  *
  * Lo stato completo viene salvato automaticamente come bozza nel
  * localStorage del dispositivo (nessuna sincronizzazione multi-
@@ -88,7 +85,6 @@ function fondiConDefault(statoCaricato) {
 export default function App() {
   const iniziale = useMemo(() => fondiConDefault(caricaBozza()?.stato), []);
 
-  const [modalita, setModalita] = useState(iniziale.modalita);
   const [tipiImpianto, setTipiImpianto] = useState(iniziale.tipiImpianto);
   const [comune, setComune] = useState(iniziale.comune);
   const [scenari, setScenari] = useState(iniziale.scenari);
@@ -102,7 +98,6 @@ export default function App() {
   const [progettoAttivoId, setProgettoAttivoId] = useState(null);
 
   const statoCompleto = {
-    modalita,
     tipiImpianto,
     comune,
     scenari,
@@ -119,11 +114,10 @@ export default function App() {
   useEffect(() => {
     salvaBozza(statoCompleto);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modalita, tipiImpianto, comune, scenari, scenarioAttivoId, acs, sistemaCentralizzato, solareTermico, fotovoltaico, trattamentoAcque, pompeIdrauliche]);
+  }, [tipiImpianto, comune, scenari, scenarioAttivoId, acs, sistemaCentralizzato, solareTermico, fotovoltaico, trattamentoAcque, pompeIdrauliche]);
 
   function caricaProgetto(progettoSalvato) {
     const s = fondiConDefault(progettoSalvato.stato);
-    setModalita(s.modalita);
     setTipiImpianto(s.tipiImpianto);
     setComune(s.comune);
     setScenari(s.scenari);
@@ -166,26 +160,23 @@ export default function App() {
       .map((s) => ({ ...s, edificio: calcolaEdificioConOverride(s.ambienti, comune) }));
   }, [scenari, comune, tipiImpianto.climatizzazione]);
 
-  const scenarioAttivoCalcolato = scenariCalcolati.find((s) => s.id === scenarioAttivoId);
   const climatizzazionePronta = !tipiImpianto.climatizzazione || scenariCalcolati.length > 0;
-
-  if (!modalita) {
-    return <ModeSelector onSelect={setModalita} />;
-  }
 
   // Numerazione dinamica delle sezioni di input, in base a cosa è effettivamente mostrato.
   let numeroSezione = 0;
   const prossimoNumero = () => ++numeroSezione;
   const nComune = tipiImpianto.climatizzazione ? prossimoNumero() : null;
-  const nScenari = tipiImpianto.climatizzazione && modalita === "ingegnere" ? prossimoNumero() : null;
+  const nScenari = tipiImpianto.climatizzazione ? prossimoNumero() : null;
   const nAmbienti = tipiImpianto.climatizzazione ? prossimoNumero() : null;
   const nAcs = tipiImpianto.acs ? prossimoNumero() : null;
   const nTrattamentoAcque = tipiImpianto.trattamentoAcque ? prossimoNumero() : null;
   const nPompeIdrauliche = tipiImpianto.pompeIdrauliche ? prossimoNumero() : null;
 
+  const mostraRisultati = pronto && climatizzazionePronta && (tipiImpianto.climatizzazione || tipiImpianto.acs || tipiImpianto.trattamentoAcque || tipiImpianto.pompeIdrauliche);
+
   return (
     <div className="min-h-screen">
-      <Header modalita={modalita} onCambiaModalita={setModalita} />
+      <Header />
 
       <main className="max-w-6xl mx-auto px-4 py-6 space-y-6">
         <div className="flex flex-wrap gap-2 justify-end no-print">
@@ -222,7 +213,7 @@ export default function App() {
           </button>
         )}
 
-        {tipiImpianto.climatizzazione && modalita === "ingegnere" && (
+        {tipiImpianto.climatizzazione && (
           <section className="bg-white border border-slate-200 rounded-xl p-4 space-y-3 no-print">
             <StepHeader numero={nScenari} titolo="Scenari a confronto" sottotitolo="es. stato di fatto vs. post-riqualificazione" />
             <ScenariTabs
@@ -239,38 +230,36 @@ export default function App() {
             <StepHeader numero={nAmbienti} titolo={`Ambienti — ${scenarioAttivo.nome}`} />
             <AmbientiList
               ambienti={scenarioAttivo.ambienti}
-              modalita={modalita}
               onChange={(ambienti) => aggiornaAmbientiScenario(scenarioAttivo.id, ambienti)}
             />
             <SistemaCentralizzatoPanel
               sistemaCentralizzato={sistemaCentralizzato}
               onChange={setSistemaCentralizzato}
               numeroAmbienti={scenarioAttivo.ambienti.length}
-              modalita={modalita}
             />
-            {modalita === "ingegnere" && <FotovoltaicoPanel fotovoltaico={fotovoltaico} onChange={setFotovoltaico} />}
+            <FotovoltaicoPanel fotovoltaico={fotovoltaico} onChange={setFotovoltaico} />
           </section>
         )}
 
         {tipiImpianto.acs && (
           <section className="space-y-3 no-print">
             <StepHeader numero={nAcs} titolo="Acqua calda sanitaria" />
-            <ACSForm acs={acs} onChange={setAcs} modalita={modalita} />
-            {modalita === "ingegnere" && <SolareTermicoPanel solareTermico={solareTermico} onChange={setSolareTermico} />}
+            <ACSForm acs={acs} onChange={setAcs} />
+            <SolareTermicoPanel solareTermico={solareTermico} onChange={setSolareTermico} />
           </section>
         )}
 
         {tipiImpianto.trattamentoAcque && (
           <section className="space-y-3 no-print">
             <StepHeader numero={nTrattamentoAcque} titolo="Trattamento acque" />
-            <TrattamentoAcqueForm trattamentoAcque={trattamentoAcque} onChange={setTrattamentoAcque} modalita={modalita} />
+            <TrattamentoAcqueForm trattamentoAcque={trattamentoAcque} onChange={setTrattamentoAcque} />
           </section>
         )}
 
         {tipiImpianto.pompeIdrauliche && (
           <section className="space-y-3 no-print">
             <StepHeader numero={nPompeIdrauliche} titolo="Pompe idrauliche" />
-            <PompeIdraulicheForm pompeIdrauliche={pompeIdrauliche} onChange={setPompeIdrauliche} modalita={modalita} />
+            <PompeIdraulicheForm pompeIdrauliche={pompeIdrauliche} onChange={setPompeIdrauliche} />
           </section>
         )}
 
@@ -283,21 +272,17 @@ export default function App() {
           </div>
         )}
 
-        {pronto && climatizzazionePronta && (tipiImpianto.climatizzazione || tipiImpianto.acs || tipiImpianto.trattamentoAcque || tipiImpianto.pompeIdrauliche) && (
+        {mostraRisultati && (
           <section className="pt-2">
             <div className="no-print rounded-2xl bg-brand-700 text-white p-5 shadow-lg shadow-brand-700/25">
               <span className="text-[11px] font-bold tracking-[0.2em] uppercase text-brand-200">Risultati</span>
-              <h2 className="font-bold text-xl leading-tight mt-0.5">
-                {modalita === "ingegnere" ? "Relazione di calcolo" : "Riepilogo e preventivo"}
-              </h2>
+              <h2 className="font-bold text-xl leading-tight mt-0.5">Relazione di calcolo e preventivo</h2>
               <p className="text-sm text-brand-100 mt-1">
-                {modalita === "ingegnere"
-                  ? "Calcolo completo, con ogni passaggio, coefficiente e riferimento normativo applicato."
-                  : "Fabbisogno sintetico, prodotti consigliati e richiesta preventivo pronta da inviare."}
+                Calcolo completo, con ogni passaggio, coefficiente e riferimento normativo applicato, prodotto
+                consigliato per categoria e richiesta preventivo pronta da inviare.
               </p>
             </div>
             <div className="mt-5">
-            {modalita === "ingegnere" ? (
               <RelazioneCalcolo
                 scenari={scenariCalcolati}
                 comune={comune}
@@ -309,29 +294,13 @@ export default function App() {
                 fotovoltaico={fotovoltaico}
                 trattamentoAcque={trattamentoAcque}
                 pompeIdrauliche={pompeIdrauliche}
-                modalita={modalita}
               />
-            ) : (
-              <PreventivoView
-                scenario={scenarioAttivoCalcolato}
-                comune={comune}
-                acs={acs}
-                branding={BRANDING_FISSO}
-                tipiImpianto={tipiImpianto}
-                sistemaCentralizzato={sistemaCentralizzato}
-                solareTermico={solareTermico}
-                fotovoltaico={fotovoltaico}
-                trattamentoAcque={trattamentoAcque}
-                pompeIdrauliche={pompeIdrauliche}
-                modalita={modalita}
-              />
-            )}
             </div>
           </section>
         )}
       </main>
 
-      {modalita === "venditore" && pronto && climatizzazionePronta && <FloatingCTA />}
+      {mostraRisultati && <FloatingCTA />}
     </div>
   );
 }

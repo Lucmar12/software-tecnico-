@@ -30,14 +30,13 @@ const EDIFICIO_VUOTO = {
 };
 
 /**
- * Output della modalità Ingegnere/Tecnico: "Relazione di calcolo"
- * esportabile/stampabile, con ogni passaggio, coefficiente e riferimento
- * normativo in primo piano. Il prodotto a catalogo compare come tabella
- * tecnica comparativa, non come proposta commerciale. Mostra solo i
- * blocchi (climatizzazione, ACS, trattamento acque, pompe idrauliche)
- * effettivamente richiesti.
+ * Unico output dell'app: relazione di calcolo esportabile/stampabile, con
+ * ogni passaggio, coefficiente e riferimento normativo in primo piano, il
+ * riepilogo "Prodotto consigliato" per categoria e il form di richiesta
+ * preventivo in primo piano. Mostra solo i blocchi (climatizzazione, ACS,
+ * trattamento acque, pompe idrauliche) effettivamente richiesti.
  */
-export default function RelazioneCalcolo({ scenari, comune, acs, branding, tipiImpianto, sistemaCentralizzato, solareTermico, fotovoltaico, trattamentoAcque, pompeIdrauliche, modalita }) {
+export default function RelazioneCalcolo({ scenari, comune, acs, branding, tipiImpianto, sistemaCentralizzato, solareTermico, fotovoltaico, trattamentoAcque, pompeIdrauliche }) {
   const mostraClima = tipiImpianto.climatizzazione;
   const mostraAcs = tipiImpianto.acs;
   const mostraTrattamentoAcque = tipiImpianto.trattamentoAcque;
@@ -73,7 +72,7 @@ export default function RelazioneCalcolo({ scenari, comune, acs, branding, tipiI
         </button>
       </div>
 
-      <IntestazioneStampa branding={branding} comune={comune} titolo="Relazione di calcolo" sottotitolo="Dimensionamento impianto — modalità Ingegnere/Tecnico" />
+      <IntestazioneStampa branding={branding} comune={comune} titolo="Relazione di calcolo" sottotitolo="Dimensionamento impianto residenziale" />
 
       <RiepilogoSceltaProdotti voci={vociRiepilogo} />
 
@@ -134,13 +133,13 @@ export default function RelazioneCalcolo({ scenari, comune, acs, branding, tipiI
 
       {mostraTrattamentoAcque && (
         <section className="print-break">
-          <AddolcitoreDettaglio trattamentoAcque={trattamentoAcque} modalita={modalita} />
+          <AddolcitoreDettaglio trattamentoAcque={trattamentoAcque} />
         </section>
       )}
 
       {mostraPompeIdrauliche && (
         <section className="print-break">
-          <PompeIdraulicheDettaglio pompeIdrauliche={pompeIdrauliche} modalita={modalita} />
+          <PompeIdraulicheDettaglio pompeIdrauliche={pompeIdrauliche} />
         </section>
       )}
 
@@ -152,8 +151,7 @@ export default function RelazioneCalcolo({ scenari, comune, acs, branding, tipiI
           edificio={mostraClima && scenari[0] ? scenari[0].edificio : EDIFICIO_VUOTO}
           comune={comune}
           branding={branding}
-          modalita="ingegnere"
-          evidenziato={false}
+          evidenziato={true}
         />
       </div>
 

@@ -15,7 +15,7 @@ const EMAIL_SUPPORTO_PLACEHOLDER = "supporto-tecnico@azienda-esempio.it";
  * WhatsApp o copiabile negli appunti. Ogni invio viene registrato nello
  * storico locale del dispositivo (non una dashboard multi-installatore).
  */
-export default function RichiediPreventivo({ prodottiConsigliati, edificio, comune, branding, modalita, evidenziato }) {
+export default function RichiediPreventivo({ prodottiConsigliati, edificio, comune, branding, evidenziato }) {
   const [lead, setLead] = useState({ nomeAzienda: "", clienteFinale: "", email: "", telefono: "", note: "" });
   const [selezionati, setSelezionati] = useState(() => new Set(prodottiConsigliati.slice(0, 1).map((p) => `${p.marchio}|${p.modello}`)));
   const [prioritaria, setPrioritaria] = useState(false);
@@ -42,7 +42,6 @@ export default function RichiediPreventivo({ prodottiConsigliati, edificio, comu
       clienteFinale: lead.clienteFinale || null,
       comune: comune?.nome || null,
       nProdotti: prodottiSelezionati.length,
-      modalita,
     });
   }
 
@@ -51,7 +50,7 @@ export default function RichiediPreventivo({ prodottiConsigliati, edificio, comu
       setInviato(true);
       return;
     }
-    const testo = generaRiepilogoTesto({ branding, comune, edificio, prodottiSelezionati, lead, modalita });
+    const testo = generaRiepilogoTesto({ branding, comune, edificio, prodottiSelezionati, lead });
     const oggetto = prioritaria
       ? "[SUPPORTO TECNICO PRIORITARIO] Richiesta preventivo — dimensionamento impianto"
       : "Richiesta preventivo — dimensionamento impianto";
@@ -61,13 +60,13 @@ export default function RichiediPreventivo({ prodottiConsigliati, edificio, comu
   }
 
   function handleWhatsApp() {
-    const testo = generaRiepilogoTesto({ branding, comune, edificio, prodottiSelezionati, lead, modalita });
+    const testo = generaRiepilogoTesto({ branding, comune, edificio, prodottiSelezionati, lead });
     registraInvio("whatsapp");
     window.open(generaWhatsAppLink(testo), "_blank", "noopener,noreferrer");
   }
 
   async function handleCopia() {
-    const testo = generaRiepilogoTesto({ branding, comune, edificio, prodottiSelezionati, lead, modalita });
+    const testo = generaRiepilogoTesto({ branding, comune, edificio, prodottiSelezionati, lead });
     const ok = await copiaNegliAppunti(testo);
     setCopiato(ok);
     if (ok) registraInvio("copia");

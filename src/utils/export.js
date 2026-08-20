@@ -21,7 +21,7 @@ export function formattaEuro(v) {
  * prodotti selezionati, contatti) da usare sia per il link mailto: sia
  * per la copia negli appunti.
  */
-export function generaRiepilogoTesto({ branding, comune, edificio, prodottiSelezionati, lead, modalita }) {
+export function generaRiepilogoTesto({ branding, comune, edificio, prodottiSelezionati, lead }) {
   const righe = [];
   righe.push(`RICHIESTA PREVENTIVO — ${branding?.nomeAzienda || "[Azienda]"}`);
   righe.push("");
@@ -57,11 +57,7 @@ export function generaRiepilogoTesto({ branding, comune, edificio, prodottiSelez
     righe.push(`Note: ${lead.note}`);
   }
   righe.push("");
-  righe.push(
-    modalita === "ingegnere"
-      ? "Calcolo eseguito in modalità Ingegnere/Tecnico (dettaglio normativo completo disponibile su richiesta)."
-      : "Calcolo eseguito in modalità Venditore/Installatore (stima rapida da sopralluogo)."
-  );
+  righe.push("Calcolo eseguito con dettaglio normativo completo (relazione tecnica disponibile su richiesta).");
   righe.push(`Dimensionamento realizzato con ${branding?.nomeAzienda || "[Azienda]"}`);
   return righe.join("\n");
 }

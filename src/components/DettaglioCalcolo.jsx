@@ -23,8 +23,8 @@ function Riga({ label, value, nota }) {
  * Pannello "Dettaglio calcolo tecnico": riporta ogni passaggio, il
  * coefficiente applicato e la norma di riferimento per un singolo
  * ambiente, secondo UNI EN 12831 (invernale) e metodo Carrier / UNI 10339
- * (estivo). Può essere aperto o collassato di default a seconda della
- * modalità d'uso (Ingegnere: aperto; Venditore: collassato).
+ * (estivo). Aperto di default; `defaultOpen` resta configurabile dal
+ * chiamante per contesti specifici (es. collassato nella card prodotto).
  *
  * Il kW è sempre il valore primario. Il BTU/h (taglia commerciale split)
  * ha senso solo quando l'ambiente sarà servito da un climatizzatore

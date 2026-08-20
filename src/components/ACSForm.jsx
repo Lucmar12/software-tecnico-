@@ -19,7 +19,7 @@ const OPZIONI_GENERATORE = [
  * calcolare la potenza [kW] della macchina — non è solo una scelta di
  * capacità in litri.
  */
-export default function ACSForm({ acs, onChange, modalita }) {
+export default function ACSForm({ acs, onChange }) {
   const generatore = acs.generatore || "elettrico";
   const isPompaDiCalore = generatore !== "elettrico";
 
@@ -60,13 +60,7 @@ export default function ACSForm({ acs, onChange, modalita }) {
         </select>
       </label>
 
-      {isPompaDiCalore && modalita !== "ingegnere" && (
-        <p className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-lg p-3">
-          Tempo di ricarica e COP calcolati con valori di default (rispettivamente {TEMPO_RICARICA_DEFAULT_ORE} h e{" "}
-          {COP_ACS_DEFAULT}) — modificabili passando alla modalità Ingegnere.
-        </p>
-      )}
-      {isPompaDiCalore && modalita === "ingegnere" && (
+      {isPompaDiCalore && (
         <div className="grid sm:grid-cols-2 gap-3 bg-slate-50 border border-slate-200 rounded-lg p-3">
           <label className="block">
             <span className="text-xs font-medium text-slate-500">Tempo di ricarica desiderato [h]</span>

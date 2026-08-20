@@ -11,13 +11,9 @@ const inputCls = "mt-1 w-full border border-slate-300 rounded-lg px-2.5 py-1.5 t
  * pannelli radianti). Le due tipologie sono alternative tra loro — un
  * ambiente non può essere servito contemporaneamente da entrambe.
  * Richiede almeno 2 ambienti (un impianto centralizzato ha senso solo
- * per servirne più di uno). In modalità Venditore mostra solo la scelta
- * del tipo, senza i parametri tecnici (contemporaneità, tubazioni,
- * dislivello): quei valori restano ai default e vengono comunque
- * applicati al calcolo, ma non sono pensati per una compilazione rapida
- * da sopralluogo — restano modificabili solo passando a Ingegnere.
+ * per servirne più di uno).
  */
-export default function SistemaCentralizzatoPanel({ sistemaCentralizzato, onChange, numeroAmbienti, modalita }) {
+export default function SistemaCentralizzatoPanel({ sistemaCentralizzato, onChange, numeroAmbienti }) {
   if (numeroAmbienti < 2) {
     return (
       <div className="bg-slate-50 border border-dashed border-slate-300 rounded-xl p-4 text-xs text-slate-500">
@@ -59,14 +55,7 @@ export default function SistemaCentralizzatoPanel({ sistemaCentralizzato, onChan
         />
       </div>
 
-      {sistemaCentralizzato.tipo === "vrf" && modalita !== "ingegnere" && (
-        <p className="text-xs text-slate-500 pt-2 border-t border-slate-100">
-          Un'unica unità esterna servirà tutti gli ambienti inseriti. Fattore di contemporaneità e derating per
-          tubazioni/dislivello sono calcolati con valori convenzionali di default — modificabili passando alla
-          modalità Ingegnere.
-        </p>
-      )}
-      {sistemaCentralizzato.tipo === "vrf" && modalita === "ingegnere" && (
+      {sistemaCentralizzato.tipo === "vrf" && (
         <div className="space-y-3 pt-2 border-t border-slate-100">
           <p className="text-xs text-slate-500">
             Un'unica unità esterna serve tutti gli ambienti inseriti. Il dimensionamento applica un fattore di
@@ -109,14 +98,7 @@ export default function SistemaCentralizzatoPanel({ sistemaCentralizzato, onChan
         </div>
       )}
 
-      {sistemaCentralizzato.tipo === "chiller" && modalita !== "ingegnere" && (
-        <p className="text-xs text-slate-500 pt-2 border-t border-slate-100">
-          Produzione centralizzata con distribuzione ad acqua verso ventilconvettori o pannelli radianti. Il fattore
-          di contemporaneità è calcolato con un valore convenzionale di default — modificabile passando alla
-          modalità Ingegnere.
-        </p>
-      )}
-      {sistemaCentralizzato.tipo === "chiller" && modalita === "ingegnere" && (
+      {sistemaCentralizzato.tipo === "chiller" && (
         <div className="space-y-3 pt-2 border-t border-slate-100">
           <p className="text-xs text-slate-500">
             Produzione centralizzata con distribuzione ad acqua verso ventilconvettori o pannelli radianti. Il

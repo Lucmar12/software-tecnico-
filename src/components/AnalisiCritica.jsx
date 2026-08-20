@@ -1,7 +1,7 @@
 import React from "react";
 
 /**
- * Analisi critica del fabbisogno (solo modalità Ingegnere): individua se
+ * Analisi critica del fabbisogno: individua se
  * il carico è dominato da trasmissione o ventilazione, quali ambienti
  * hanno le dispersioni più critiche per m² e se l'involucro (in
  * particolare i serramenti) rappresenta il vero collo di bottiglia

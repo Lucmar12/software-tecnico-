@@ -23,14 +23,11 @@ const inputCls =
   "mt-1 w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400";
 
 /**
- * Form di input per un singolo ambiente.
- * - modalita "venditore": campi essenziali, pensati per la compilazione
- *   rapida da mobile durante il sopralluogo.
- * - modalita "ingegnere": tutti i campi di dettaglio costruttivo, più la
- *   possibilità di sovrascrivere trasmittanze e temperature di progetto
- *   (con avviso di calcolo non standard).
+ * Form di input per un singolo ambiente: tutti i campi di dettaglio
+ * costruttivo, più la possibilità di sovrascrivere trasmittanze e
+ * temperature di progetto (con avviso di calcolo non standard).
  */
-export default function AmbienteForm({ ambiente, modalita, onChange, onRemove }) {
+export default function AmbienteForm({ ambiente, onChange, onRemove }) {
   const [overrideAperto, setOverrideAperto] = useState(
     Boolean(ambiente.trasmittanzeOverride || ambiente.teInvOverride != null || ambiente.tbseOverride != null)
   );
@@ -85,39 +82,33 @@ export default function AmbienteForm({ ambiente, modalita, onChange, onRemove })
           />
         </Campo>
 
-        {modalita === "ingegnere" && (
-          <Campo label={ETICHETTE_CAMPI.altezza} errore={errori.altezza} stimato={stimati.has("altezza")}>
-            <input
-              type="number"
-              step="0.1"
-              className={inputCls}
-              value={ambiente.altezza}
-              onChange={(e) => set("altezza", Number(e.target.value))}
-            />
-          </Campo>
-        )}
+        <Campo label={ETICHETTE_CAMPI.altezza} errore={errori.altezza} stimato={stimati.has("altezza")}>
+          <input
+            type="number"
+            step="0.1"
+            className={inputCls}
+            value={ambiente.altezza}
+            onChange={(e) => set("altezza", Number(e.target.value))}
+          />
+        </Campo>
 
-        {modalita === "ingegnere" && (
-          <Campo label={ETICHETTE_CAMPI.superficieMuriEsterni} errore={errori.superficieMuriEsterni} stimato={stimati.has("superficieMuriEsterni")}>
-            <input
-              type="number"
-              className={inputCls}
-              value={ambiente.superficieMuriEsterni}
-              onChange={(e) => set("superficieMuriEsterni", Number(e.target.value))}
-            />
-          </Campo>
-        )}
+        <Campo label={ETICHETTE_CAMPI.superficieMuriEsterni} errore={errori.superficieMuriEsterni} stimato={stimati.has("superficieMuriEsterni")}>
+          <input
+            type="number"
+            className={inputCls}
+            value={ambiente.superficieMuriEsterni}
+            onChange={(e) => set("superficieMuriEsterni", Number(e.target.value))}
+          />
+        </Campo>
 
-        {modalita === "ingegnere" && (
-          <Campo label={ETICHETTE_CAMPI.superficieFinestre} errore={errori.superficieFinestre} stimato={stimati.has("superficieFinestre")}>
-            <input
-              type="number"
-              className={inputCls}
-              value={ambiente.superficieFinestre}
-              onChange={(e) => set("superficieFinestre", Number(e.target.value))}
-            />
-          </Campo>
-        )}
+        <Campo label={ETICHETTE_CAMPI.superficieFinestre} errore={errori.superficieFinestre} stimato={stimati.has("superficieFinestre")}>
+          <input
+            type="number"
+            className={inputCls}
+            value={ambiente.superficieFinestre}
+            onChange={(e) => set("superficieFinestre", Number(e.target.value))}
+          />
+        </Campo>
 
         <Campo label="Esposizione prevalente">
           <select
@@ -176,21 +167,19 @@ export default function AmbienteForm({ ambiente, modalita, onChange, onRemove })
         </Campo>
       </div>
 
-      {modalita === "ingegnere" && (
-        <label className="flex items-start gap-2 text-xs pt-2 border-t border-slate-100">
-          <input
-            type="checkbox"
-            className="mt-0.5"
-            checked={Boolean(ambiente.pareteVersoNonRiscaldato)}
-            onChange={(e) => set("pareteVersoNonRiscaldato", e.target.checked)}
-          />
-          <span className="text-slate-600">
-            Parte della superficie di muro esterno affaccia su un ambiente NON riscaldato (vano scala, garage,
-            cantina) anziché sull'esterno — riduce la dispersione di quella quota (fattore b, UNI EN 12831)
-          </span>
-        </label>
-      )}
-      {modalita === "ingegnere" && ambiente.pareteVersoNonRiscaldato && (
+      <label className="flex items-start gap-2 text-xs pt-2 border-t border-slate-100">
+        <input
+          type="checkbox"
+          className="mt-0.5"
+          checked={Boolean(ambiente.pareteVersoNonRiscaldato)}
+          onChange={(e) => set("pareteVersoNonRiscaldato", e.target.checked)}
+        />
+        <span className="text-slate-600">
+          Parte della superficie di muro esterno affaccia su un ambiente NON riscaldato (vano scala, garage,
+          cantina) anziché sull'esterno — riduce la dispersione di quella quota (fattore b, UNI EN 12831)
+        </span>
+      </label>
+      {ambiente.pareteVersoNonRiscaldato && (
         <label className="block max-w-xs text-xs">
           <span className="text-slate-500">Quota di muro esterno verso il locale non riscaldato [%]</span>
           <input
@@ -204,8 +193,7 @@ export default function AmbienteForm({ ambiente, modalita, onChange, onRemove })
         </label>
       )}
 
-      {modalita === "ingegnere" && (
-        <div className="pt-2 border-t border-slate-100">
+      <div className="pt-2 border-t border-slate-100">
           <button
             className="text-xs text-brand-700 underline"
             onClick={() => {
@@ -277,7 +265,6 @@ export default function AmbienteForm({ ambiente, modalita, onChange, onRemove })
             </div>
           )}
         </div>
-      )}
     </div>
   );
 }
