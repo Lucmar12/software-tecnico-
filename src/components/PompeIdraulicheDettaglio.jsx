@@ -1,5 +1,10 @@
 import React, { useState } from "react";
-import { calcolaAutoclave, calcolaSollevamento, calcolaCircolazione, PRESSIONE_RESIDUA_MINIMA_BAR_DEFAULT } from "../utils/pompeIdrauliche.js";
+import { calcolaAutoclave, calcolaSollevamento, calcolaCircolazione, kwToCv, PRESSIONE_RESIDUA_MINIMA_BAR_DEFAULT } from "../utils/pompeIdrauliche.js";
+
+/** Formatta la potenza del motore [kW, valore primario] con il CV tra parentesi come valore secondario — taglia commerciale corrente per le elettropompe. */
+function formattaPotenzaMotore(potenzaKw) {
+  return `${potenzaKw} kW (${kwToCv(potenzaKw).toFixed(2)} CV)`;
+}
 import { trovaPompeConsigliate } from "../data/catalogo.js";
 
 /**
@@ -37,7 +42,7 @@ export default function PompeIdraulicheDettaglio({ pompeIdrauliche, modalita }) 
           della rete (diametri, tracciato, apparecchi effettivamente installati) compete alla progettazione idraulica
           esecutiva.
         </p>
-        <ListaProdotti risultato={risultatoAutoclave} formattaVoce={(p) => `${p.marchio} ${p.modello} — ${p.portataNominaleMc} m³/h, ${p.prevalenzaM} m`} />
+        <ListaProdotti risultato={risultatoAutoclave} formattaVoce={(p) => `${p.marchio} ${p.modello} — ${p.portataNominaleMc} m³/h, ${p.prevalenzaM} m, ${formattaPotenzaMotore(p.potenzaKw)}`} />
       </SottoSezione>
 
       {sollevamentoAttivo && (
@@ -47,7 +52,7 @@ export default function PompeIdraulicheDettaglio({ pompeIdrauliche, modalita }) 
             <Riga label="Portata richiesta" value={`${sollevamento.portataMc.toFixed(2)} m³/h`} />
             <Riga label="Prevalenza manometrica richiesta" value={<strong>{sollevamento.prevalenzaM.toFixed(1)} m</strong>} />
           </div>
-          <ListaProdotti risultato={risultatoSollevamento} formattaVoce={(p) => `${p.marchio} ${p.modello} — ${p.portataNominaleMc} m³/h, ${p.prevalenzaM} m`} />
+          <ListaProdotti risultato={risultatoSollevamento} formattaVoce={(p) => `${p.marchio} ${p.modello} — ${p.portataNominaleMc} m³/h, ${p.prevalenzaM} m, ${formattaPotenzaMotore(p.potenzaKw)}`} />
         </SottoSezione>
       )}
 
@@ -59,7 +64,7 @@ export default function PompeIdraulicheDettaglio({ pompeIdrauliche, modalita }) 
             <Riga label="Portata di ricircolo richiesta" value={<strong>{circolazione.portataRicircoloLh.toFixed(0)} l/h</strong>} nota={`salto termico max ammesso 5 K`} />
             <Riga label="Prevalenza manometrica richiesta" value={`${circolazione.prevalenzaM.toFixed(1)} m`} />
           </div>
-          <ListaProdotti risultato={risultatoCircolazione} formattaVoce={(p) => `${p.marchio} ${p.modello} — ${(p.portataNominaleMc * 1000).toFixed(0)} l/h, ${p.prevalenzaM} m`} />
+          <ListaProdotti risultato={risultatoCircolazione} formattaVoce={(p) => `${p.marchio} ${p.modello} — ${(p.portataNominaleMc * 1000).toFixed(0)} l/h, ${p.prevalenzaM} m, ${formattaPotenzaMotore(p.potenzaKw)}`} />
         </SottoSezione>
       )}
     </div>

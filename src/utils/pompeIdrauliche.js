@@ -20,6 +20,14 @@
 /** Colonna d'acqua equivalente a 1 bar di pressione [m]. */
 export const M_PER_BAR = 10.2;
 
+/** Potenza equivalente a 1 CV (cavallo vapore, unità commerciale corrente per i motori delle elettropompe) [kW]. */
+export const KW_PER_CV = 0.7355;
+
+/** Converte la potenza del motore da kW (valore primario) a CV (valore secondario, taglia commerciale delle elettropompe). */
+export function kwToCv(kw) {
+  return kw / KW_PER_CV;
+}
+
 /** Pressione residua minima al punto di erogazione più sfavorito, di default (UNI 9182) [bar]. */
 export const PRESSIONE_RESIDUA_MINIMA_BAR_DEFAULT = 1.5;
 
