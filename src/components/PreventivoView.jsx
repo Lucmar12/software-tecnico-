@@ -11,20 +11,12 @@ import FotovoltaicoDettaglio from "./FotovoltaicoDettaglio.jsx";
 import PompaCaloreAcsDettaglio from "./PompaCaloreAcsDettaglio.jsx";
 import AddolcitoreDettaglio from "./AddolcitoreDettaglio.jsx";
 import PompeIdraulicheDettaglio from "./PompeIdraulicheDettaglio.jsx";
+import RiepilogoSceltaProdotti from "./RiepilogoSceltaProdotti.jsx";
 import { calcolaBollitore, ZONE_CLIMATICHE } from "../data/calculations.js";
-import {
-  trovaBollitoriConsigliati,
-  trovaProdottiConsigliati,
-  trovaFotovoltaicoConsigliati,
-  trovaPannelliSolariConsigliati,
-  trovaAddolcitoriConsigliati,
-  trovaPompeConsigliate,
-} from "../data/catalogo.js";
 import { calcolaDimensionamentoVRF } from "../utils/vrf.js";
 import { calcolaDimensionamentoChiller } from "../utils/chiller.js";
 import { formattaKw, formattaBtu } from "../utils/export.js";
-import { calcolaAddolcitore } from "../utils/addolcitore.js";
-import { calcolaAutoclave, calcolaSollevamento, calcolaCircolazione } from "../utils/pompeIdrauliche.js";
+import { calcolaVociRiepilogoProdotti, prodottiSelezionabiliDaVoci } from "../utils/riepilogoProdotti.js";
 
 const EDIFICIO_VUOTO = {
   risultatiAmbienti: [],
@@ -58,7 +50,6 @@ export default function PreventivoView({ scenario, comune, acs, branding, tipiIm
   }
 
   const bollitore = calcolaBollitore(acs.numeroPersone, acs.abitudine);
-  const { consigliati: bollitoriConsigliati } = trovaBollitoriConsigliati(bollitore.litriConsigliati);
 
   // Il climatizzatore va dimensionato sul maggiore tra fabbisogno invernale ed estivo (serve entrambe le stagioni).
   const fabbisognoDimensionamento = Math.max(edificio.totaleInvernaleKw, edificio.totaleEstivoKw);
@@ -76,39 +67,18 @@ export default function PreventivoView({ scenario, comune, acs, branding, tipiIm
     ? chillerDimensionamento.potenzaNominaleRichiestaKw
     : fabbisognoDimensionamento;
 
-  const prodottiClimatizzazione = mostraClima
-    ? trovaProdottiConsigliati(fabbisognoProdottoClima, tipoProdottoClima, vrfDimensionamento?.numeroUnitaInterne).consigliati
-    : [];
-
-  const addolcitore = mostraTrattamentoAcque ? calcolaAddolcitore(trattamentoAcque) : null;
-  const addolcitoriConsigliati = addolcitore ? trovaAddolcitoriConsigliati(addolcitore.volumeResinaRichiestoLitri, addolcitore.portataPuntaMc).consigliati : [];
-
-  const autoclaveDimensionamento = mostraPompeIdrauliche ? calcolaAutoclave(pompeIdrauliche.autoclave) : null;
-  const autoclaviConsigliate = autoclaveDimensionamento
-    ? trovaPompeConsigliate("autoclave", autoclaveDimensionamento.portataPuntaMc, autoclaveDimensionamento.prevalenzaM).consigliati
-    : [];
-  const sollevamentoConsigliate =
-    mostraPompeIdrauliche && pompeIdrauliche.sollevamento?.attivo
-      ? trovaPompeConsigliate("pompa_sollevamento", pompeIdrauliche.sollevamento.portataMc, calcolaSollevamento(pompeIdrauliche.sollevamento).prevalenzaM).consigliati
-      : [];
-  const circolazioneConsigliate =
-    mostraPompeIdrauliche && pompeIdrauliche.circolazione?.attivo
-      ? (() => {
-          const c = calcolaCircolazione(pompeIdrauliche.circolazione);
-          return trovaPompeConsigliate("pompa_circolazione", c.portataRicircoloMc, c.prevalenzaM).consigliati;
-        })()
-      : [];
-
-  const tuttiProdottiSelezionabili = [
-    ...prodottiClimatizzazione,
-    ...(mostraClima && fotovoltaico?.attivo ? trovaFotovoltaicoConsigliati(fotovoltaico.kWp).consigliati : []),
-    ...(mostraAcs ? bollitoriConsigliati : []),
-    ...(mostraAcs && solareTermico?.attivo ? trovaPannelliSolariConsigliati(bollitore.litriConsigliati).consigliati : []),
-    ...addolcitoriConsigliati,
-    ...autoclaviConsigliate,
-    ...sollevamentoConsigliate,
-    ...circolazioneConsigliate,
-  ];
+  const vociRiepilogo = calcolaVociRiepilogoProdotti({
+    tipiImpianto,
+    scenario: mostraClima ? scenario : null,
+    comune,
+    acs,
+    sistemaCentralizzato,
+    solareTermico,
+    fotovoltaico,
+    trattamentoAcque,
+    pompeIdrauliche,
+  });
+  const tuttiProdottiSelezionabili = prodottiSelezionabiliDaVoci(vociRiepilogo);
 
   return (
     <div className="space-y-6">
@@ -129,6 +99,8 @@ export default function PreventivoView({ scenario, comune, acs, branding, tipiIm
       </div>
 
       <IntestazioneStampa branding={branding} comune={comune} titolo="Riepilogo dimensionamento" sottotitolo="Proposta di climatizzazione residenziale" />
+
+      <RiepilogoSceltaProdotti voci={vociRiepilogo} />
 
       {mostraClima && (
         <div className="bg-white border border-slate-200 rounded-2xl p-5">

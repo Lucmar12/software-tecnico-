@@ -12,22 +12,13 @@ import FotovoltaicoDettaglio from "./FotovoltaicoDettaglio.jsx";
 import PompaCaloreAcsDettaglio from "./PompaCaloreAcsDettaglio.jsx";
 import AddolcitoreDettaglio from "./AddolcitoreDettaglio.jsx";
 import PompeIdraulicheDettaglio from "./PompeIdraulicheDettaglio.jsx";
+import RiepilogoSceltaProdotti from "./RiepilogoSceltaProdotti.jsx";
 import { calcolaBollitore, ZONE_CLIMATICHE } from "../data/calculations.js";
-import {
-  trovaProdottiConsigliati,
-  trovaBollitoriConsigliati,
-  trovaFotovoltaicoConsigliati,
-  trovaPannelliSolariConsigliati,
-  trovaAddolcitoriConsigliati,
-  trovaPompeConsigliate,
-} from "../data/catalogo.js";
-import { calcolaDimensionamentoVRF } from "../utils/vrf.js";
-import { calcolaDimensionamentoChiller } from "../utils/chiller.js";
+import { trovaBollitoriConsigliati } from "../data/catalogo.js";
 import { stimaConsumoAnnuoClimatizzazione } from "../utils/fotovoltaico.js";
 import { calcolaCO2Annua } from "../utils/co2.js";
 import { formattaKw, formattaBtu } from "../utils/export.js";
-import { calcolaAddolcitore } from "../utils/addolcitore.js";
-import { calcolaAutoclave, calcolaSollevamento, calcolaCircolazione } from "../utils/pompeIdrauliche.js";
+import { calcolaVociRiepilogoProdotti, prodottiSelezionabiliDaVoci } from "../utils/riepilogoProdotti.js";
 
 const EDIFICIO_VUOTO = {
   risultatiAmbienti: [],
@@ -52,6 +43,18 @@ export default function RelazioneCalcolo({ scenari, comune, acs, branding, tipiI
   const mostraTrattamentoAcque = tipiImpianto.trattamentoAcque;
   const mostraPompeIdrauliche = tipiImpianto.pompeIdrauliche;
 
+  const vociRiepilogo = calcolaVociRiepilogoProdotti({
+    tipiImpianto,
+    scenario: scenari[0] || null,
+    comune,
+    acs,
+    sistemaCentralizzato,
+    solareTermico,
+    fotovoltaico,
+    trattamentoAcque,
+    pompeIdrauliche,
+  });
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 no-print">
@@ -71,6 +74,8 @@ export default function RelazioneCalcolo({ scenari, comune, acs, branding, tipiI
       </div>
 
       <IntestazioneStampa branding={branding} comune={comune} titolo="Relazione di calcolo" sottotitolo="Dimensionamento impianto — modalità Ingegnere/Tecnico" />
+
+      <RiepilogoSceltaProdotti voci={vociRiepilogo} />
 
       {mostraClima &&
         scenari.map((scenario) => {
@@ -143,7 +148,7 @@ export default function RelazioneCalcolo({ scenari, comune, acs, branding, tipiI
 
       <div className="no-print">
         <RichiediPreventivo
-          prodottiConsigliati={prodottiPerRichiesta(scenari, acs, tipiImpianto, sistemaCentralizzato, solareTermico, fotovoltaico, comune, trattamentoAcque, pompeIdrauliche)}
+          prodottiConsigliati={prodottiSelezionabiliDaVoci(vociRiepilogo)}
           edificio={mostraClima && scenari[0] ? scenari[0].edificio : EDIFICIO_VUOTO}
           comune={comune}
           branding={branding}
@@ -210,47 +215,3 @@ function BollitoreDettaglio({ acs }) {
   );
 }
 
-function prodottiPerRichiesta(scenari, acs, tipiImpianto, sistemaCentralizzato, solareTermico, fotovoltaico, comune, trattamentoAcque, pompeIdrauliche) {
-  const risultati = [];
-  if (tipiImpianto.climatizzazione && scenari[0]) {
-    const primo = scenari[0];
-    const fabbisognoDimensionamento = Math.max(primo.edificio.totaleInvernaleKw, primo.edificio.totaleEstivoKw);
-    const centralizzatoAttivo = sistemaCentralizzato?.tipo !== "nessuno" && primo.edificio.risultatiAmbienti.length >= 2;
-    if (centralizzatoAttivo && sistemaCentralizzato.tipo === "vrf") {
-      const d = calcolaDimensionamentoVRF(primo.edificio.risultatiAmbienti, sistemaCentralizzato, comune?.teInv);
-      risultati.push(...trovaProdottiConsigliati(d.potenzaNominaleRichiestaKw, "vrf", d.numeroUnitaInterne).consigliati);
-    } else if (centralizzatoAttivo && sistemaCentralizzato.tipo === "chiller") {
-      const d = calcolaDimensionamentoChiller(primo.edificio.risultatiAmbienti, sistemaCentralizzato, comune?.teInv);
-      risultati.push(...trovaProdottiConsigliati(d.potenzaNominaleRichiestaKw, "chiller").consigliati);
-    } else {
-      risultati.push(...trovaProdottiConsigliati(fabbisognoDimensionamento, "climatizzatore_split").consigliati);
-    }
-    if (fotovoltaico?.attivo) {
-      risultati.push(...trovaFotovoltaicoConsigliati(fotovoltaico.kWp).consigliati);
-    }
-  }
-  if (tipiImpianto.acs) {
-    const bollitore = calcolaBollitore(acs.numeroPersone, acs.abitudine);
-    risultati.push(...trovaBollitoriConsigliati(bollitore.litriConsigliati).consigliati);
-    if (solareTermico?.attivo) {
-      risultati.push(...trovaPannelliSolariConsigliati(bollitore.litriConsigliati).consigliati);
-    }
-  }
-  if (tipiImpianto.trattamentoAcque && trattamentoAcque) {
-    const addolcitore = calcolaAddolcitore(trattamentoAcque);
-    risultati.push(...trovaAddolcitoriConsigliati(addolcitore.volumeResinaRichiestoLitri, addolcitore.portataPuntaMc).consigliati);
-  }
-  if (tipiImpianto.pompeIdrauliche && pompeIdrauliche) {
-    const autoclave = calcolaAutoclave(pompeIdrauliche.autoclave);
-    risultati.push(...trovaPompeConsigliate("autoclave", autoclave.portataPuntaMc, autoclave.prevalenzaM).consigliati);
-    if (pompeIdrauliche.sollevamento?.attivo) {
-      const sollevamento = calcolaSollevamento(pompeIdrauliche.sollevamento);
-      risultati.push(...trovaPompeConsigliate("pompa_sollevamento", pompeIdrauliche.sollevamento.portataMc, sollevamento.prevalenzaM).consigliati);
-    }
-    if (pompeIdrauliche.circolazione?.attivo) {
-      const circolazione = calcolaCircolazione(pompeIdrauliche.circolazione);
-      risultati.push(...trovaPompeConsigliate("pompa_circolazione", circolazione.portataRicircoloMc, circolazione.prevalenzaM).consigliati);
-    }
-  }
-  return risultati;
-}
