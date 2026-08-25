@@ -5,7 +5,11 @@ import {
   FATTORE_ESPOSIZIONE,
   APPORTO_SOLARE,
   ETICHETTE_TIPO_LOCALE,
+  UMIDITA_SPECIFICA_ESTERNA_G_KG,
+  UMIDITA_SPECIFICA_INTERNA_G_KG,
+  btuToKw,
 } from "../data/calculations.js";
+import { ETICHETTE_CAMPI } from "../utils/stime.js";
 
 function Riga({ label, value, nota }) {
   return (
@@ -45,7 +49,12 @@ export default function DettaglioCalcolo({ risultato, comune, defaultOpen = fals
     maggiorazionePontiTermici,
     frazioneNonRiscaldata,
     incrementoSoleAria,
+    portataRinnovoMch,
+    scomposizioneEstiva,
   } = risultato;
+
+  // Dati dell'ambiente non misurati ma assunti per stima: vanno dichiarati in relazione.
+  const campiStimati = ambiente.campiStimati || [];
 
   return (
     <div className="border border-slate-200 rounded-lg overflow-hidden">
@@ -61,6 +70,16 @@ export default function DettaglioCalcolo({ risultato, comune, defaultOpen = fals
           {nonStandard && (
             <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded p-2">
               Calcolo con coefficienti sovrascritti dal tecnico: non è un calcolo standard a valori tabellari.
+            </div>
+          )}
+
+          {campiStimati.length > 0 && (
+            <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded p-2">
+              Dati non rilevati, assunti per stima da superficie, altezza, pareti esposte e destinazione d'uso:{" "}
+              <span className="font-semibold">
+                {campiStimati.map((c) => (ETICHETTE_CAMPI[c] || c).toLowerCase()).join(", ")}
+              </span>
+              . Vanno confermati con un rilievo prima dell'ordine dei materiali.
             </div>
           )}
 
@@ -134,10 +153,25 @@ export default function DettaglioCalcolo({ risultato, comune, defaultOpen = fals
               nota={`esposizione ${ambiente.esposizionePrevalente}, irraggiamento su pareti`}
             />
             <Riga label="Apporto solare per esposizione" value={`${APPORTO_SOLARE[ambiente.esposizionePrevalente]} W/m² vetro`} />
-            <Riga label="Apporto persone" value="130 W/persona" />
-            <Riga label="Apporto apparecchiature" value="8 W/m²" />
+            <Riga label="Apporto persone" value={`${scomposizioneEstiva.personeKw.toFixed(3)} kW`} nota={`${ambiente.numeroOccupanti} occupanti × 130 W/persona (sensibile + latente)`} />
+            <Riga label="Apporto apparecchiature" value={`${scomposizioneEstiva.apparecchiKw.toFixed(3)} kW`} nota="8 W/m² convenzionali" />
+            <Riga
+              label="Rinnovo aria — quota sensibile"
+              value={`${scomposizioneEstiva.ventilazioneSensibileKw.toFixed(3)} kW`}
+              nota={`0,34 Wh/m³K × ${portataRinnovoMch.toFixed(1)} m³/h × ${(tbse - TEMP_INTERNA_ESTIVA).toFixed(1)} K`}
+            />
+            <Riga
+              label="Rinnovo aria — quota latente (deumidificazione)"
+              value={`${scomposizioneEstiva.ventilazioneLatenteKw.toFixed(3)} kW`}
+              nota={`0,83 × ${portataRinnovoMch.toFixed(1)} m³/h × ${scomposizioneEstiva.deltaUmiditaGKg.toFixed(1)} g/kg (x esterna ${UMIDITA_SPECIFICA_ESTERNA_G_KG} — interna ${UMIDITA_SPECIFICA_INTERNA_G_KG} g/kg)`}
+            />
             <Riga label="Margine di sicurezza" value="+10%" />
-            <Riga label="Totale carico estivo" value={<strong>{risultato.estivoKw.toFixed(3)} kW</strong>} />
+            <Riga label="Totale carico estivo (sensibile + latente)" value={<strong>{risultato.estivoKw.toFixed(3)} kW</strong>} />
+            <p className="text-[11px] text-slate-400 mt-1">
+              Carico calcolato alla temperatura di picco di progetto, senza correzione per l'escursione termica
+              giornaliera: assunzione a favore di sicurezza. L'umidità specifica esterna è un valore convenzionale
+              per l'Italia centrale, non il bulbo umido puntuale del comune.
+            </p>
           </div>
 
           <div className="bg-brand-50 border border-brand-200 rounded-lg p-3">
@@ -158,7 +192,7 @@ export default function DettaglioCalcolo({ risultato, comune, defaultOpen = fals
                 label="Taglia commerciale suggerita (split)"
                 value={
                   risultato.tagliaCommerciale.disponibile
-                    ? `${(risultato.tagliaCommerciale.btu / 3412).toFixed(1)} kW (${risultato.tagliaCommerciale.btu.toLocaleString("it-IT")} BTU/h)`
+                    ? `${btuToKw(risultato.tagliaCommerciale.btu).toFixed(1)} kW (${risultato.tagliaCommerciale.btu.toLocaleString("it-IT")} BTU/h)`
                     : risultato.tagliaCommerciale.messaggio
                 }
               />

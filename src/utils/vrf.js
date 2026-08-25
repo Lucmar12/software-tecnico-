@@ -17,6 +17,7 @@
  * catalogo (vedi utils/deratingPompaDiCalore.js).
  */
 import { calcolaPotenzaNominaleRichiesta } from "./deratingPompaDiCalore.js";
+import { fabbisognoDiImpianto } from "./fabbisognoImpianto.js";
 
 /** Fattore di contemporaneità convenzionale per impianto VRF residenziale (tutti gli ambienti raramente al massimo carico contemporaneamente). */
 export const FATTORE_CONTEMPORANEITA_DEFAULT = 0.8;
@@ -54,7 +55,7 @@ export function calcolaFattoreDeratingVRF({ lunghezzaEquivalenteM, dislivelloM }
  */
 export function calcolaDimensionamentoVRF(risultatiAmbienti, parametri, temperaturaEsternaProgetto = null) {
   const { fattoreContemporaneita = FATTORE_CONTEMPORANEITA_DEFAULT, lunghezzaEquivalenteM, dislivelloM } = parametri;
-  const sommaFabbisogniKw = risultatiAmbienti.reduce((s, r) => s + r.fabbisognoDimensionamento, 0);
+  const { totaleInvernaleKw, totaleEstivoKw, sommaFabbisogniKw, stagioneDimensionante } = fabbisognoDiImpianto(risultatiAmbienti);
   const potenzaConContemporaneitaKw = sommaFabbisogniKw * fattoreContemporaneita;
   const fattoreDeratingTubazioni = calcolaFattoreDeratingVRF({ lunghezzaEquivalenteM, dislivelloM });
   const potenzaRichiestaUnitaEsternaKw = potenzaConContemporaneitaKw / fattoreDeratingTubazioni;
@@ -66,6 +67,9 @@ export function calcolaDimensionamentoVRF(risultatiAmbienti, parametri, temperat
 
   return {
     numeroUnitaInterne: risultatiAmbienti.length,
+    totaleInvernaleKw,
+    totaleEstivoKw,
+    stagioneDimensionante,
     sommaFabbisogniKw,
     fattoreContemporaneita,
     potenzaConContemporaneitaKw,

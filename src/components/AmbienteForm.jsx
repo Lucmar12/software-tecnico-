@@ -1,19 +1,29 @@
 import React, { useState } from "react";
 import { OPZIONI_ESPOSIZIONE, OPZIONI_EPOCA, OPZIONI_TIPO_LOCALE } from "../utils/modelli.js";
-import { ETICHETTE_CAMPI } from "../utils/stime.js";
+import { ETICHETTE_CAMPI, CAMPI_STIMABILI, OPZIONI_PARETI_ESTERNE, applicaStime } from "../utils/stime.js";
 import { validaAmbiente } from "../utils/validazione.js";
 import { TRASMITTANZE_PER_EPOCA } from "../data/calculations.js";
 
-function Campo({ label, children, errore, stimato }) {
+function Campo({ label, children, errore, stimato, nota, onRipristinaStima }) {
   return (
     <label className="block">
-      <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
+      <span className="text-xs font-medium text-slate-500 flex items-center gap-1 flex-wrap">
         {label}
         {stimato && (
-          <span className="text-[10px] bg-amber-100 text-amber-800 px-1 rounded font-semibold">da verificare</span>
+          <span className="text-[10px] bg-amber-100 text-amber-800 px-1 rounded font-semibold">stimato</span>
+        )}
+        {!stimato && onRipristinaStima && (
+          <button
+            type="button"
+            onClick={onRipristinaStima}
+            className="text-[10px] text-brand-700 underline font-medium"
+          >
+            torna alla stima
+          </button>
         )}
       </span>
       {children}
+      {nota && <span className="text-[10px] text-slate-400 leading-tight block mt-0.5">{nota}</span>}
       {errore && <span className="text-[11px] text-red-600">{errore}</span>}
     </label>
   );
@@ -22,10 +32,20 @@ function Campo({ label, children, errore, stimato }) {
 const inputCls =
   "mt-1 w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400";
 
+const inputStimatoCls = `${inputCls} bg-amber-50/60 border-amber-200`;
+
 /**
- * Form di input per un singolo ambiente: tutti i campi di dettaglio
- * costruttivo, più la possibilità di sovrascrivere trasmittanze e
- * temperature di progetto (con avviso di calcolo non standard).
+ * Form di input per un singolo ambiente.
+ *
+ * L'ordine dei campi segue quello che l'utente sa senza misurare
+ * (superficie, altezza, destinazione d'uso, pareti esposte, piano,
+ * epoca); i dati che richiederebbero un rilievo — superficie dei muri
+ * esterni, superficie finestrata, occupanti — sono raggruppati a parte e
+ * precompilati per stima (vedi utils/stime.js), modificabili in
+ * qualunque momento e ripristinabili alla stima.
+ *
+ * In coda, chiusi di default, gli override di trasmittanze e temperature
+ * di progetto per chi dispone di una diagnosi energetica.
  */
 export default function AmbienteForm({ ambiente, onChange, onRemove }) {
   const [overrideAperto, setOverrideAperto] = useState(
@@ -34,9 +54,21 @@ export default function AmbienteForm({ ambiente, onChange, onRemove }) {
   const errori = validaAmbiente(ambiente);
   const stimati = new Set(ambiente.campiStimati || []);
 
+  /**
+   * Aggiorna un campo. Se il campo era stimato, l'inserimento manuale lo
+   * fa uscire dalla lista dei campi stimati; in ogni caso le stime
+   * ancora attive vengono ricalcolate, perché il campo appena modificato
+   * può esserne una sorgente (superficie, altezza, pareti, tipo locale).
+   */
   function set(campo, valore) {
-    const nuovoCampiStimati = (ambiente.campiStimati || []).filter((c) => c !== campo);
-    onChange({ ...ambiente, [campo]: valore, campiStimati: nuovoCampiStimati });
+    const campiStimati = (ambiente.campiStimati || []).filter((c) => c !== campo);
+    onChange(applicaStime({ ...ambiente, [campo]: valore, campiStimati }));
+  }
+
+  /** Rimette un campo sotto il controllo della stima automatica. */
+  function ripristinaStima(campo) {
+    const campiStimati = [...new Set([...(ambiente.campiStimati || []), campo])];
+    onChange(applicaStime({ ...ambiente, campiStimati }));
   }
 
   function setPiano(tipo) {
@@ -56,6 +88,8 @@ export default function AmbienteForm({ ambiente, onChange, onRemove }) {
       onChange({ ...ambiente, trasmittanzeOverride: null });
     }
   }
+
+  const tuttiStimati = CAMPI_STIMABILI.every((c) => stimati.has(c));
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
@@ -82,7 +116,7 @@ export default function AmbienteForm({ ambiente, onChange, onRemove }) {
           />
         </Campo>
 
-        <Campo label={ETICHETTE_CAMPI.altezza} errore={errori.altezza} stimato={stimati.has("altezza")}>
+        <Campo label="Altezza interna [m]" errore={errori.altezza}>
           <input
             type="number"
             step="0.1"
@@ -92,22 +126,28 @@ export default function AmbienteForm({ ambiente, onChange, onRemove }) {
           />
         </Campo>
 
-        <Campo label={ETICHETTE_CAMPI.superficieMuriEsterni} errore={errori.superficieMuriEsterni} stimato={stimati.has("superficieMuriEsterni")}>
-          <input
-            type="number"
-            className={inputCls}
-            value={ambiente.superficieMuriEsterni}
-            onChange={(e) => set("superficieMuriEsterni", Number(e.target.value))}
-          />
+        <Campo label="Tipo locale" nota="Determina i ricambi d'aria convenzionali (UNI 10339)">
+          <select className={inputCls} value={ambiente.tipoLocale || "soggiorno"} onChange={(e) => set("tipoLocale", e.target.value)}>
+            {OPZIONI_TIPO_LOCALE.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
         </Campo>
 
-        <Campo label={ETICHETTE_CAMPI.superficieFinestre} errore={errori.superficieFinestre} stimato={stimati.has("superficieFinestre")}>
-          <input
-            type="number"
+        <Campo label="Pareti che danno sull'esterno" nota="Quanti lati dell'ambiente confinano con l'esterno">
+          <select
             className={inputCls}
-            value={ambiente.superficieFinestre}
-            onChange={(e) => set("superficieFinestre", Number(e.target.value))}
-          />
+            value={ambiente.paretiEsterne ?? 1}
+            onChange={(e) => set("paretiEsterne", Number(e.target.value))}
+          >
+            {OPZIONI_PARETI_ESTERNE.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
         </Campo>
 
         <Campo label="Esposizione prevalente">
@@ -145,26 +185,61 @@ export default function AmbienteForm({ ambiente, onChange, onRemove }) {
             ))}
           </select>
         </Campo>
+      </div>
 
-        <Campo label={ETICHETTE_CAMPI.numeroOccupanti} errore={errori.numeroOccupanti} stimato={stimati.has("numeroOccupanti")}>
-          <input
-            type="number"
-            className={inputCls}
-            value={ambiente.numeroOccupanti}
-            onChange={(e) => set("numeroOccupanti", Number(e.target.value))}
-          />
-        </Campo>
+      <div className="pt-3 border-t border-slate-100 space-y-2">
+        <p className="text-[11px] text-slate-500">
+          {tuttiStimati
+            ? "I dati qui sotto sono calcolati automaticamente dai valori inseriti sopra: modificali solo se hai un rilievo o un progetto con le misure reali."
+            : "Dati di dettaglio. Quelli con il badge “stimato” sono calcolati dai valori inseriti sopra."}
+        </p>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <Campo
+            label={`${ETICHETTE_CAMPI.superficieMuriEsterni} [m²]`}
+            errore={errori.superficieMuriEsterni}
+            stimato={stimati.has("superficieMuriEsterni")}
+            nota={stimati.has("superficieMuriEsterni") ? "√superficie × altezza × pareti esterne" : null}
+            onRipristinaStima={() => ripristinaStima("superficieMuriEsterni")}
+          >
+            <input
+              type="number"
+              className={stimati.has("superficieMuriEsterni") ? inputStimatoCls : inputCls}
+              value={ambiente.superficieMuriEsterni}
+              onChange={(e) => set("superficieMuriEsterni", Number(e.target.value))}
+            />
+          </Campo>
 
-        <Campo label="Tipo locale">
-          <select className={inputCls} value={ambiente.tipoLocale || "soggiorno"} onChange={(e) => set("tipoLocale", e.target.value)}>
-            {OPZIONI_TIPO_LOCALE.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-          <span className="text-[10px] text-slate-400">Determina i ricambi d'aria convenzionali (UNI 10339)</span>
-        </Campo>
+          <Campo
+            label={`${ETICHETTE_CAMPI.superficieFinestre} [m²]`}
+            errore={errori.superficieFinestre}
+            stimato={stimati.has("superficieFinestre")}
+            nota={stimati.has("superficieFinestre") ? "rapporto aeroilluminante minimo di legge" : null}
+            onRipristinaStima={() => ripristinaStima("superficieFinestre")}
+          >
+            <input
+              type="number"
+              step="0.1"
+              className={stimati.has("superficieFinestre") ? inputStimatoCls : inputCls}
+              value={ambiente.superficieFinestre}
+              onChange={(e) => set("superficieFinestre", Number(e.target.value))}
+            />
+          </Campo>
+
+          <Campo
+            label={ETICHETTE_CAMPI.numeroOccupanti}
+            errore={errori.numeroOccupanti}
+            stimato={stimati.has("numeroOccupanti")}
+            nota={stimati.has("numeroOccupanti") ? "affollamento convenzionale del tipo di locale" : null}
+            onRipristinaStima={() => ripristinaStima("numeroOccupanti")}
+          >
+            <input
+              type="number"
+              className={stimati.has("numeroOccupanti") ? inputStimatoCls : inputCls}
+              value={ambiente.numeroOccupanti}
+              onChange={(e) => set("numeroOccupanti", Number(e.target.value))}
+            />
+          </Campo>
+        </div>
       </div>
 
       <label className="flex items-start gap-2 text-xs pt-2 border-t border-slate-100">

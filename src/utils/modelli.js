@@ -4,6 +4,7 @@
  * data/calculations.js; qui vivono solo le liste di opzioni per i form.
  */
 import { ETICHETTE_EPOCA, ETICHETTE_TIPO_LOCALE } from "../data/calculations.js";
+import { CAMPI_STIMABILI, applicaStime } from "./stime.js";
 
 export const OPZIONI_ESPOSIZIONE = [
   { value: "nord", label: "Nord" },
@@ -28,28 +29,37 @@ function generaId() {
     : `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+/**
+ * Un ambiente nasce con i dati geometrici che l'utente non ha modo di
+ * misurare (muri esterni, finestre, occupanti) già stimati a partire da
+ * superficie, altezza, pareti esposte e destinazione d'uso: il calcolo
+ * è quindi disponibile fin dal primo istante e l'utente lavora per
+ * correzione, non per compilazione a vuoto. I campi stimati restano
+ * elencati in `campiStimati` finché non vengono inseriti a mano.
+ */
 export function nuovoAmbiente(overrides = {}) {
-  return {
+  return applicaStime({
     id: generaId(),
     nome: "Nuovo ambiente",
     superficiePavimento: 14,
     altezza: 2.7,
-    superficieMuriEsterni: 9,
-    superficieFinestre: 2,
+    paretiEsterne: 1,
+    superficieMuriEsterni: 0,
+    superficieFinestre: 0,
     esposizionePrevalente: "sud",
     ultimoPiano: false,
     pianoTerra: false,
     epocaCostruttiva: "1991-2005",
-    numeroOccupanti: 1,
+    numeroOccupanti: 0,
     tipoLocale: "soggiorno",
     pareteVersoNonRiscaldato: false,
     frazioneSuperficieNonRiscaldata: 30,
-    campiStimati: [],
+    campiStimati: [...CAMPI_STIMABILI],
     trasmittanzeOverride: null,
     teInvOverride: null,
     tbseOverride: null,
     ...overrides,
-  };
+  });
 }
 
 export function nuovoScenario(nome = "Stato di fatto", ambienti = null) {
@@ -61,7 +71,7 @@ export function nuovoScenario(nome = "Stato di fatto", ambienti = null) {
 }
 
 import { DUREZZA_INGRESSO_DEFAULT_GF, DUREZZA_RESIDUA_DEFAULT_GF, CONSUMO_LITRI_PERSONA_GIORNO_DEFAULT, AUTONOMIA_GIORNI_DEFAULT } from "./addolcitore.js";
-import { PRESSIONE_RESIDUA_MINIMA_BAR_DEFAULT, PERDITE_CARICO_PCT_DEFAULT } from "./pompeIdrauliche.js";
+import { PRESSIONE_RESIDUA_MINIMA_BAR_DEFAULT, PERDITE_CARICO_PCT_DEFAULT, NUMERO_BAGNI_DEFAULT } from "./pompeIdrauliche.js";
 
 export function nuovoTrattamentoAcque(overrides = {}) {
   return {
@@ -79,6 +89,9 @@ export function nuovaPompeIdrauliche(overrides = {}) {
     autoclave: {
       numeroPersone: 3,
       numeroPiani: 2,
+      // La portata di punta si ricava dagli apparecchi installati (UNI 9182), non dal consumo giornaliero.
+      numeroBagni: NUMERO_BAGNI_DEFAULT,
+      haLavatrice: true,
       pressioneResiduaBar: PRESSIONE_RESIDUA_MINIMA_BAR_DEFAULT,
       perditeCaricoPct: PERDITE_CARICO_PCT_DEFAULT,
       consumoLitriPersonaGiorno: CONSUMO_LITRI_PERSONA_GIORNO_DEFAULT,

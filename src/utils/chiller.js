@@ -20,6 +20,7 @@
  * distinto a catalogo, si assume qui il caso tipico aria-refrigerato.
  */
 import { calcolaPotenzaNominaleRichiesta } from "./deratingPompaDiCalore.js";
+import { fabbisognoDiImpianto } from "./fabbisognoImpianto.js";
 
 /** Fattore di contemporaneità convenzionale per impianto a chiller residenziale/plurifamiliare. */
 export const FATTORE_CONTEMPORANEITA_CHILLER_DEFAULT = 0.85;
@@ -36,7 +37,7 @@ export const FATTORE_CONTEMPORANEITA_CHILLER_DEFAULT = 0.85;
  */
 export function calcolaDimensionamentoChiller(risultatiAmbienti, parametri, temperaturaEsternaProgetto = null) {
   const { fattoreContemporaneita = FATTORE_CONTEMPORANEITA_CHILLER_DEFAULT } = parametri;
-  const sommaFabbisogniKw = risultatiAmbienti.reduce((s, r) => s + r.fabbisognoDimensionamento, 0);
+  const { totaleInvernaleKw, totaleEstivoKw, sommaFabbisogniKw, stagioneDimensionante } = fabbisognoDiImpianto(risultatiAmbienti);
   const potenzaRichiestaKw = sommaFabbisogniKw * fattoreContemporaneita;
 
   const { fattoreDerating: fattoreDeratingTemperatura, potenzaNominaleRichiestaKw } =
@@ -46,6 +47,9 @@ export function calcolaDimensionamentoChiller(risultatiAmbienti, parametri, temp
 
   return {
     numeroTerminali: risultatiAmbienti.length,
+    totaleInvernaleKw,
+    totaleEstivoKw,
+    stagioneDimensionante,
     sommaFabbisogniKw,
     fattoreContemporaneita,
     potenzaRichiestaKw,

@@ -1,6 +1,15 @@
 /**
- * calculations.js — Motore di calcolo del fabbisogno termico per il
- * dimensionamento di impianti di climatizzazione residenziale.
+ * calculations.js — Dati tabellari normativi e calcoli non geometrici
+ * (ACS, consumi, taglie commerciali) per il dimensionamento di impianti
+ * residenziali.
+ *
+ * Il calcolo del carico termico per ambiente NON vive qui: è in
+ * utils/overrides.js, unico motore dell'applicazione, che applica le
+ * formule UNI EN 12831 / Carrier ai valori tabellari di questo file
+ * aggiungendo ponti termici, fattore b, ricambi per destinazione d'uso e
+ * temperatura sole-aria. Questo file resta la sola fonte dei dati
+ * normativi; duplicare qui le formule significherebbe avere due motori
+ * che divergono in silenzio.
  *
  * Metodologia e riferimenti normativi:
  * - UNI EN 12831   : metodo di calcolo del carico termico invernale di
@@ -140,6 +149,37 @@ export const FATTORE_B_LOCALE_NON_RISCALDATO = 0.5;
  */
 export const INCREMENTO_SOLE_ARIA_PER_ESPOSIZIONE = { nord: 2, sud: 8, est: 6, ovest: 10 };
 
+/**
+ * CARICO LATENTE DELL'ARIA DI RINNOVO (regime estivo).
+ *
+ * L'aria esterna immessa in ambiente non va solo raffreddata: va anche
+ * deumidificata. Trascurare questa quota sottostima il carico estivo
+ * totale — e per un'utenza residenziale con ricambi elevati (bagni,
+ * cucina) la quota latente può superare quella sensibile. La potenza
+ * frigorifera di una macchina è dichiarata come potenza TOTALE, quindi è
+ * al carico totale (sensibile + latente) che va confrontata.
+ *
+ * Q_latente [W] = 0,83 × portata [m³/h] × Δx [g/kg]
+ * dove 0,83 = ρ_aria (1,2 kg/m³) × calore latente di vaporizzazione
+ * (≈2501 kJ/kg) / 3600, con Δx in grammi per kg di aria secca.
+ */
+export const COEFF_CALORE_LATENTE_W_PER_MCH_G = 0.83;
+
+/** Umidità specifica dell'aria interna alle condizioni di progetto estive (26 °C, 50% UR) [g/kg aria secca]. */
+export const UMIDITA_SPECIFICA_INTERNA_G_KG = 10.5;
+
+/**
+ * Umidità specifica dell'aria esterna di progetto estiva [g/kg aria
+ * secca], valore convenzionale per il clima dell'Italia centrale
+ * (≈32 °C, 50% UR). Il dato puntuale per comune (bulbo umido di
+ * progetto, UNI 10339) non è presente nel dataset climatico: in sua
+ * assenza si assume questo valore, dichiarato in relazione.
+ */
+export const UMIDITA_SPECIFICA_ESTERNA_G_KG = 15.0;
+
+/** Differenza di umidità specifica di progetto fra aria esterna e interna [g/kg]. */
+export const DELTA_UMIDITA_SPECIFICA_G_KG = UMIDITA_SPECIFICA_ESTERNA_G_KG - UMIDITA_SPECIFICA_INTERNA_G_KG;
+
 /** BTU/h per kW (fattore di conversione). */
 const BTU_PER_KW = 3412;
 
@@ -159,6 +199,12 @@ export const ETICHETTE_ABITUDINE_ACS = {
   vasca_frequente: "Uso frequente di vasca (~70 l/persona/giorno)",
 };
 
+/** Calore specifico dell'acqua [Wh/(litro·K)]. */
+export const CALORE_SPECIFICO_ACQUA_WH_L_K = 1.163;
+
+/** Salto termico convenzionale di riscaldamento dell'ACS, da rete a set-point di accumulo [K]. */
+export const DELTA_T_ACS_K = 30;
+
 /** Taglie commerciali standard dei bollitori/scaldacqua [litri]. */
 export const TAGLIE_BOLLITORE_STANDARD = [50, 80, 100, 120, 150, 200, 300];
 
@@ -169,113 +215,6 @@ export const EFFICIENZA_PER_CLASSE = {
   "A+": { seer: 5.6, scop: 3.8 },
   A: { seer: 5.1, scop: 3.4 },
 };
-
-// ---------------------------------------------------------------------
-// CARICO TERMICO INVERNALE — UNI EN 12831
-// ---------------------------------------------------------------------
-
-/**
- * Dispersione termica per trasmissione dell'ambiente (UNI EN 12831),
- * comprensiva di maggiorazioni per esposizione e posizione in edificio.
- * @returns {number} Potenza dispersa per trasmissione [W]
- */
-export function calcolaQTrasmissione(ambiente, epoca, comune) {
-  const U = TRASMITTANZE_PER_EPOCA[epoca];
-  const deltaT = TEMP_INTERNA_PROGETTO - comune.teInv;
-  const superficieMuroNetta = Math.max(0, ambiente.superficieMuriEsterni - ambiente.superficieFinestre);
-  const Q_muri = U.muro * superficieMuroNetta * deltaT;
-  const Q_vetri = U.vetro * ambiente.superficieFinestre * deltaT;
-  const Q_tetto = ambiente.ultimoPiano ? U.tetto * ambiente.superficiePavimento * deltaT : 0;
-  const Q_pavimento = ambiente.pianoTerra ? U.pavimento * ambiente.superficiePavimento * deltaT * 0.7 : 0;
-  const fattoreEsp = FATTORE_ESPOSIZIONE[ambiente.esposizionePrevalente];
-  const fattorePiano = ambiente.ultimoPiano
-    ? MAGGIORAZIONE_ULTIMO_PIANO
-    : ambiente.pianoTerra
-    ? MAGGIORAZIONE_PIANO_TERRA
-    : MAGGIORAZIONE_PIANO_INTERMEDIO;
-  return (Q_muri + Q_vetri + Q_tetto + Q_pavimento) * fattoreEsp * fattorePiano; // Watt
-}
-
-/**
- * Dispersione termica per ventilazione dell'ambiente (UNI EN 12831),
- * con ricambio d'aria convenzionale residenziale (UNI 10339).
- * @returns {number} Potenza dispersa per ventilazione [W]
- */
-export function calcolaQVentilazione(ambiente, comune) {
-  const volumeAmbiente = ambiente.superficiePavimento * ambiente.altezza;
-  const deltaT = TEMP_INTERNA_PROGETTO - comune.teInv;
-  return 0.34 * RICAMBI_ARIA_ORA * volumeAmbiente * deltaT; // Watt
-}
-
-/**
- * Carico termico invernale di progetto dell'ambiente (UNI EN 12831).
- * @returns {number} Fabbisogno invernale [kW]
- */
-export function calcolaCaricoTermicoInvernale(ambiente, epoca, comune) {
-  return (calcolaQTrasmissione(ambiente, epoca, comune) + calcolaQVentilazione(ambiente, comune)) / 1000;
-}
-
-// ---------------------------------------------------------------------
-// CARICO TERMICO ESTIVO — Metodo Carrier, dati UNI 10339
-// ---------------------------------------------------------------------
-
-/**
- * Carico termico estivo di progetto dell'ambiente (metodo Carrier
- * semplificato), con margine di sicurezza del 10%.
- * @returns {number} Fabbisogno estivo [kW]
- */
-export function calcolaCaricoEstivo(ambiente, epoca, comune) {
-  const U = TRASMITTANZE_PER_EPOCA[epoca];
-  const deltaT = comune.tbse - TEMP_INTERNA_ESTIVA;
-  const Q_trasm =
-    (U.muro * Math.max(0, ambiente.superficieMuriEsterni - ambiente.superficieFinestre) +
-      U.vetro * ambiente.superficieFinestre) *
-    deltaT;
-  const Q_solare = ambiente.superficieFinestre * APPORTO_SOLARE[ambiente.esposizionePrevalente] * 0.5;
-  const Q_persone = ambiente.numeroOccupanti * 130; // W/persona
-  const Q_apparecchi = ambiente.superficiePavimento * 8; // W/m²
-  const volumeAmbiente = ambiente.superficiePavimento * ambiente.altezza;
-  const Q_vent = 0.34 * RICAMBI_ARIA_ORA * volumeAmbiente * deltaT;
-  const totale = Q_trasm + Q_solare + Q_persone + Q_apparecchi + Q_vent;
-  return (totale * 1.1) / 1000; // +10% margine di sicurezza, kW
-}
-
-/** Scomposizione del carico invernale in trasmissione/ventilazione, per l'analisi critica del fabbisogno. */
-export function scomponiCaricoInvernale(ambiente, epoca, comune) {
-  const trasmissioneW = calcolaQTrasmissione(ambiente, epoca, comune);
-  const ventilazioneW = calcolaQVentilazione(ambiente, comune);
-  const totaleW = trasmissioneW + ventilazioneW;
-  return {
-    trasmissioneKw: trasmissioneW / 1000,
-    ventilazioneKw: ventilazioneW / 1000,
-    totaleKw: totaleW / 1000,
-    quotaTrasmissionePct: totaleW > 0 ? (trasmissioneW / totaleW) * 100 : 0,
-    quotaVentilazionePct: totaleW > 0 ? (ventilazioneW / totaleW) * 100 : 0,
-  };
-}
-
-/**
- * Scomposizione della dispersione per trasmissione nelle singole componenti
- * (muri, vetri, tetto, pavimento) prima dell'applicazione dei fattori di
- * esposizione/piano — utile per individuare il "collo di bottiglia"
- * dell'involucro (es. incidenza dei serramenti sul totale).
- */
-export function scomponiComponentiInvolucro(ambiente, epoca, comune) {
-  const U = TRASMITTANZE_PER_EPOCA[epoca];
-  const deltaT = TEMP_INTERNA_PROGETTO - comune.teInv;
-  const superficieMuroNetta = Math.max(0, ambiente.superficieMuriEsterni - ambiente.superficieFinestre);
-  const muriW = U.muro * superficieMuroNetta * deltaT;
-  const vetriW = U.vetro * ambiente.superficieFinestre * deltaT;
-  const tettoW = ambiente.ultimoPiano ? U.tetto * ambiente.superficiePavimento * deltaT : 0;
-  const pavimentoW = ambiente.pianoTerra ? U.pavimento * ambiente.superficiePavimento * deltaT * 0.7 : 0;
-  const totaleW = muriW + vetriW + tettoW + pavimentoW || 1; // evita divisione per zero
-  return {
-    muri: { kw: muriW / 1000, pct: (muriW / totaleW) * 100 },
-    vetri: { kw: vetriW / 1000, pct: (vetriW / totaleW) * 100 },
-    tetto: { kw: tettoW / 1000, pct: (tettoW / totaleW) * 100 },
-    pavimento: { kw: pavimentoW / 1000, pct: (pavimentoW / totaleW) * 100 },
-  };
-}
 
 // ---------------------------------------------------------------------
 // CONVERSIONI E SCELTA TAGLIA COMMERCIALE
@@ -318,7 +257,11 @@ export function calcolaBollitore(numeroPersone, abitudine) {
   const litriGiorno = numeroPersone * LITRI_ACS_PER_PERSONA[abitudine];
   const litriConsigliati = litriGiorno * 1.2;
   const taglia = TAGLIE_BOLLITORE_STANDARD.find((t) => t >= litriConsigliati);
-  const kWhGiorno = (litriGiorno * 1.163 * 30) / 1000; // riscaldamento da 10°C a 45°C circa, deltaT convenzionale 30K
+  // Salto termico convenzionale da temperatura di rete (~10°C) a set-point
+  // di accumulo (~40°C). Lo stesso ΔT è usato da utils/pompaDiCaloreAcs.js
+  // per la potenza di ricarica: la stessa grandezza fisica non può avere
+  // due valori diversi in due punti dell'app.
+  const kWhGiorno = (litriGiorno * CALORE_SPECIFICO_ACQUA_WH_L_K * DELTA_T_ACS_K) / 1000;
   return {
     taglia: taglia || null,
     taglioNonDisponibile: !taglia,
@@ -350,58 +293,4 @@ export function confrontaClassiEnergetiche(kwFabbisogno, oreFunzionamento, modal
     classe,
     kWhAnno: calcolaConsumoAnnuo(kwFabbisogno, oreFunzionamento, efficienza, modalita),
   }));
-}
-
-// ---------------------------------------------------------------------
-// AGGREGAZIONE A LIVELLO DI EDIFICIO / SCENARIO
-// ---------------------------------------------------------------------
-
-/**
- * Calcola il riepilogo tecnico completo di un ambiente: carico invernale,
- * carico estivo, scomposizione delle dispersioni e taglia commerciale
- * suggerita.
- */
-export function calcolaAmbiente(ambiente, comune) {
-  const epoca = ambiente.epocaCostruttiva;
-  const invernaleKw = calcolaCaricoTermicoInvernale(ambiente, epoca, comune);
-  const estivoKw = calcolaCaricoEstivo(ambiente, epoca, comune);
-  const scomposizioneInvernale = scomponiCaricoInvernale(ambiente, epoca, comune);
-  const componentiInvolucro = scomponiComponentiInvolucro(ambiente, epoca, comune);
-  const fabbisognoDimensionamento = Math.max(invernaleKw, estivoKw);
-  return {
-    ambiente,
-    invernaleKw,
-    estivoKw,
-    invernaleBtu: kwToBtu(invernaleKw),
-    estivoBtu: kwToBtu(estivoKw),
-    fabbisognoDimensionamento,
-    tagliaCommerciale: scegliTagliaCommerciale(fabbisognoDimensionamento),
-    scomposizioneInvernale,
-    componentiInvolucro,
-  };
-}
-
-/** Aggrega i risultati di più ambienti nel totale di edificio/scenario. */
-export function calcolaEdificio(ambienti, comune) {
-  const risultatiAmbienti = ambienti.map((a) => calcolaAmbiente(a, comune));
-  const totaleInvernaleKw = risultatiAmbienti.reduce((s, r) => s + r.invernaleKw, 0);
-  const totaleEstivoKw = risultatiAmbienti.reduce((s, r) => s + r.estivoKw, 0);
-  const superficieTotale = ambienti.reduce((s, a) => s + a.superficiePavimento, 0);
-  return {
-    risultatiAmbienti,
-    totaleInvernaleKw,
-    totaleEstivoKw,
-    totaleInvernaleBtu: kwToBtu(totaleInvernaleKw),
-    totaleEstivoBtu: kwToBtu(totaleEstivoKw),
-    superficieTotale,
-    // Ambiente con la maggiore incidenza di fabbisogno per m² — utile per
-    // l'analisi critica ("quali ambienti hanno le dispersioni più critiche").
-    ambientePiuCritico: risultatiAmbienti.reduce((peggiore, r) => {
-      const intensita = r.invernaleKw / (r.ambiente.superficiePavimento || 1);
-      const intensitaPeggiore = peggiore
-        ? peggiore.invernaleKw / (peggiore.ambiente.superficiePavimento || 1)
-        : -Infinity;
-      return intensita > intensitaPeggiore ? r : peggiore;
-    }, null),
-  };
 }

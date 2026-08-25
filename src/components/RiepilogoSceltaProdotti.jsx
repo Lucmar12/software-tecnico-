@@ -10,9 +10,13 @@ import { formattaEuro } from "../utils/export.js";
  * per chi vuole approfondire. Mostrato subito dopo l'intestazione, prima
  * di ogni dettaglio tecnico.
  *
+ * Quando l'utente sta confrontando più situazioni, il titolo dichiara a
+ * quale si riferisce la proposta: il riferimento non va mai presunto.
+ *
  * @param {Array<{chiave: string, icona: string, titolo: string, prodotto: object|null, specifica: string, messaggio: string|null}>} voci
+ * @param {string|null} nomeScenario nome della situazione preventivata, se ce n'è più di una
  */
-export default function RiepilogoSceltaProdotti({ voci }) {
+export default function RiepilogoSceltaProdotti({ voci, nomeScenario = null }) {
   const vociValide = voci.filter(Boolean);
   if (vociValide.length === 0) return null;
 
@@ -20,6 +24,11 @@ export default function RiepilogoSceltaProdotti({ voci }) {
     <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3">
       <div>
         <h2 className="font-bold text-lg text-slate-800">Prodotto consigliato — per categoria</h2>
+        {nomeScenario && (
+          <p className="text-sm text-brand-700 font-semibold mt-0.5">
+            Riferito alla situazione che vuoi realizzare: {nomeScenario}
+          </p>
+        )}
         <p className="text-xs text-slate-400 mt-0.5">
           La proposta con il miglior compromesso classe energetica/prezzo tra i prodotti a catalogo idonei al
           fabbisogno calcolato. Dettaglio di calcolo e alternative disponibili più sotto.

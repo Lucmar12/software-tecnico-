@@ -31,7 +31,26 @@ export default function PompeIdraulicheDettaglio({ pompeIdrauliche }) {
 
       <SottoSezione titolo="Autoclave (gruppo di pressurizzazione)">
         <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
-          <Riga label="Portata di punta stimata" value={`${autoclave.portataPuntaMc.toFixed(2)} m³/h`} />
+          <Riga
+            label="Apparecchi sanitari serviti"
+            value={autoclave.numeroApparecchi}
+            nota={`${autoclave.numeroBagni} ${autoclave.numeroBagni === 1 ? "bagno" : "bagni"}, cucina${autoclave.haLavatrice ? ", lavatrice" : ""}`}
+          />
+          <Riga
+            label="Somma portate nominali"
+            value={`${autoclave.sommaPortateLs.toFixed(2)} l/s`}
+            nota="portate per apparecchio, UNI 9182"
+          />
+          <Riga
+            label="Coefficiente di contemporaneità"
+            value={`× ${autoclave.contemporaneita.toFixed(2)}`}
+            nota={`1/√(n−1) con n = ${autoclave.numeroApparecchi} apparecchi`}
+          />
+          <Riga
+            label="Portata di punta di progetto"
+            value={<strong>{`${autoclave.portataPuntaMc.toFixed(2)} m³/h`}</strong>}
+            nota={`${autoclave.portataPuntaLmin.toFixed(0)} l/min — ${autoclave.portataPuntaLs.toFixed(2)} l/s`}
+          />
           <Riga label="Altezza geodetica" value={`${autoclave.altezzaGeodeticaM.toFixed(1)} m`} />
           <Riga label="Prevalenza manometrica richiesta" value={<strong>{autoclave.prevalenzaM.toFixed(1)} m</strong>} nota={`pressione residua minima ${pompeIdrauliche.autoclave.pressioneResiduaBar ?? PRESSIONE_RESIDUA_MINIMA_BAR_DEFAULT} bar, UNI 9182`} />
           <Riga label="Pressione di esercizio equivalente" value={`${autoclave.pressioneEsercizioBar.toFixed(1)} bar`} />

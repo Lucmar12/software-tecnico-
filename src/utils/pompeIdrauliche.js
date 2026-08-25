@@ -40,8 +40,29 @@ export const ALTEZZA_PIANO_M = 3;
 /** Consumo idrico domestico medio pro capite di default [litri/persona/giorno] — coerente con il modulo trattamento acque. */
 export const CONSUMO_LITRI_PERSONA_GIORNO_DEFAULT = 150;
 
-/** Quota del consumo giornaliero convenzionalmente concentrata nell'ora di punta, di default. */
-export const FATTORE_PUNTA_ORARIO_DEFAULT = 0.12;
+/**
+ * Portate nominali di erogazione degli apparecchi sanitari [l/s] —
+ * UNI 9182, prospetto delle portate nominali per apparecchio a uso
+ * residenziale. Sono le portate che ciascun apparecchio richiede quando
+ * è in erogazione, non un consumo medio.
+ */
+export const PORTATA_NOMINALE_APPARECCHI_LS = {
+  lavabo: 0.10,
+  vaso: 0.10,
+  bidet: 0.10,
+  doccia: 0.15,
+  lavello: 0.20,
+  lavastoviglie: 0.10,
+  lavatrice: 0.10,
+};
+
+/** Composizione convenzionale di un bagno completo (lavabo, vaso, bidet, doccia). */
+const APPARECCHI_PER_BAGNO = ["lavabo", "vaso", "bidet", "doccia"];
+/** Composizione convenzionale della cucina (lavello + lavastoviglie). */
+const APPARECCHI_CUCINA = ["lavello", "lavastoviglie"];
+
+/** Numero di bagni di default dell'abitazione. */
+export const NUMERO_BAGNI_DEFAULT = 2;
 
 /** Perdite di carico della tubazione di mandata della pompa di sollevamento, stima forfettaria di default [% del dislivello]. */
 export const PERDITE_CARICO_SOLLEVAMENTO_PCT_DEFAULT = 10;
@@ -61,24 +82,73 @@ export const COEFF_PERDITA_CARICO_RICIRCOLO_M_PER_M = 0.02;
  * necessaria a garantire la pressione residua minima al punto di
  * erogazione più sfavorito (UNI 9182).
  */
+/**
+ * Portata di punta della rete di distribuzione interna [l/s], con il
+ * metodo UNI 9182: somma delle portate nominali degli apparecchi
+ * installati, ridotta dal coefficiente di contemporaneità.
+ *
+ * La portata di punta NON si ricava dal consumo giornaliero: un'utenza
+ * da 450 l/giorno non richiede 54 l/h alla rete, perché il fabbisogno si
+ * concentra in erogazioni istantanee da centinaia di litri/ora ciascuna.
+ * È il numero di apparecchi che possono aprirsi insieme a dimensionare
+ * l'autoclave, non quanta acqua si consuma in una giornata.
+ *
+ * Coefficiente di contemporaneità 1/√(n−1), formulazione di uso corrente
+ * per utenze residenziali con n apparecchi; la portata risultante non
+ * scende mai sotto quella del singolo apparecchio più esigente, perché
+ * quello deve poter essere alimentato da solo.
+ */
+export function calcolaPortataPunta({ numeroBagni = NUMERO_BAGNI_DEFAULT, haLavatrice = true }) {
+  const apparecchi = [];
+  for (let i = 0; i < Math.max(1, numeroBagni); i++) apparecchi.push(...APPARECCHI_PER_BAGNO);
+  apparecchi.push(...APPARECCHI_CUCINA);
+  if (haLavatrice) apparecchi.push("lavatrice");
+
+  const portateLs = apparecchi.map((a) => PORTATA_NOMINALE_APPARECCHI_LS[a]);
+  const sommaPortateLs = portateLs.reduce((s, q) => s + q, 0);
+  const numeroApparecchi = apparecchi.length;
+  const contemporaneita = numeroApparecchi > 1 ? 1 / Math.sqrt(numeroApparecchi - 1) : 1;
+  const portataMinimaLs = Math.max(...portateLs);
+  const portataPuntaLs = Math.max(sommaPortateLs * contemporaneita, portataMinimaLs);
+
+  return {
+    numeroApparecchi,
+    sommaPortateLs,
+    contemporaneita,
+    portataPuntaLs,
+    portataPuntaMc: (portataPuntaLs * 3600) / 1000,
+    portataPuntaLmin: portataPuntaLs * 60,
+  };
+}
+
 export function calcolaAutoclave({
   numeroPersone,
   consumoLitriPersonaGiorno = CONSUMO_LITRI_PERSONA_GIORNO_DEFAULT,
-  fattorePuntaOrario = FATTORE_PUNTA_ORARIO_DEFAULT,
+  numeroBagni = NUMERO_BAGNI_DEFAULT,
+  haLavatrice = true,
   numeroPiani,
   altezzaEdificioM = null,
   pressioneResiduaBar = PRESSIONE_RESIDUA_MINIMA_BAR_DEFAULT,
   perditeCaricoPct = PERDITE_CARICO_PCT_DEFAULT,
 }) {
+  // Il consumo giornaliero non entra nella portata di punta: resta come
+  // dato di esercizio dell'utenza (utile per accumulo e trattamento acque).
   const consumoGiornalieroLitri = numeroPersone * consumoLitriPersonaGiorno;
-  const portataPuntaMc = (consumoGiornalieroLitri * fattorePuntaOrario) / 1000;
+  const punta = calcolaPortataPunta({ numeroBagni, haLavatrice });
 
   const altezzaGeodeticaM = altezzaEdificioM ?? numeroPiani * ALTEZZA_PIANO_M;
   const prevalenzaM = altezzaGeodeticaM * (1 + perditeCaricoPct / 100) + pressioneResiduaBar * M_PER_BAR;
 
   return {
     consumoGiornalieroLitri,
-    portataPuntaMc,
+    numeroBagni,
+    haLavatrice,
+    numeroApparecchi: punta.numeroApparecchi,
+    sommaPortateLs: punta.sommaPortateLs,
+    contemporaneita: punta.contemporaneita,
+    portataPuntaLs: punta.portataPuntaLs,
+    portataPuntaMc: punta.portataPuntaMc,
+    portataPuntaLmin: punta.portataPuntaLmin,
     altezzaGeodeticaM,
     prevalenzaM,
     pressioneEsercizioBar: prevalenzaM / M_PER_BAR,

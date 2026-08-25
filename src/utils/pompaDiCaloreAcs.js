@@ -16,15 +16,15 @@
  * resta soggetta alle curve di resa reali del produttore alla
  * temperatura dell'aria esterna di progetto.
  */
+import { DELTA_T_ACS_K, CALORE_SPECIFICO_ACQUA_WH_L_K } from "../data/calculations.js";
 
 /**
  * Salto termico convenzionale per il riscaldamento dell'ACS, da
- * temperatura di rete a set-point [K]. Allineato allo stesso ΔT=30K già
- * usato in calcolaBollitore (data/calculations.js) per il fabbisogno
- * energetico annuo: la stessa grandezza fisica (riscaldamento dell'ACS)
- * deve usare lo stesso ΔT ovunque nell'applicazione.
+ * temperatura di rete a set-point [K]. Riesportato dalla costante unica
+ * di data/calculations.js: la stessa grandezza fisica non può avere due
+ * definizioni indipendenti che qualcuno può disallineare.
  */
-export const DELTA_T_ACS_DEFAULT = 30;
+export const DELTA_T_ACS_DEFAULT = DELTA_T_ACS_K;
 /** Tempo di ricarica convenzionale dell'accumulo, tipicamente nelle ore di minor prelievo [h]. */
 export const TEMPO_RICARICA_DEFAULT_ORE = 6;
 /** COP tipico di uno scaldacqua/pompa di calore per ACS a punto di prova convenzionale (aria esterna ~15°C, mandata ~55°C). */
@@ -44,7 +44,7 @@ export function calcolaPotenzaPompaCaloreAcs({
   deltaT = DELTA_T_ACS_DEFAULT,
   cop = COP_ACS_DEFAULT,
 }) {
-  const energiaTermicaRichiestaKwh = (capacitaLitri * 1.163 * deltaT) / 1000;
+  const energiaTermicaRichiestaKwh = (capacitaLitri * CALORE_SPECIFICO_ACQUA_WH_L_K * deltaT) / 1000;
   const potenzaTermicaRichiestaKw = energiaTermicaRichiestaKwh / tempoRicaricaOre;
   const potenzaElettricaAssorbitaKw = potenzaTermicaRichiestaKw / cop;
   return { energiaTermicaRichiestaKwh, potenzaTermicaRichiestaKw, potenzaElettricaAssorbitaKw, tempoRicaricaOre, deltaT, cop };

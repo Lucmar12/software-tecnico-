@@ -17,7 +17,7 @@ import { calcolaBollitore, ZONE_CLIMATICHE } from "../data/calculations.js";
 import { trovaBollitoriConsigliati } from "../data/catalogo.js";
 import { stimaConsumoAnnuoClimatizzazione } from "../utils/fotovoltaico.js";
 import { calcolaCO2Annua } from "../utils/co2.js";
-import { formattaKw, formattaBtu } from "../utils/export.js";
+import { formattaKw, formattaBtu, formattaFrigorie } from "../utils/export.js";
 import { calcolaVociRiepilogoProdotti, prodottiSelezionabiliDaVoci } from "../utils/riepilogoProdotti.js";
 
 const EDIFICIO_VUOTO = {
@@ -36,15 +36,21 @@ const EDIFICIO_VUOTO = {
  * preventivo in primo piano. Mostra solo i blocchi (climatizzazione, ACS,
  * trattamento acque, pompe idrauliche) effettivamente richiesti.
  */
-export default function RelazioneCalcolo({ scenari, comune, acs, branding, tipiImpianto, sistemaCentralizzato, solareTermico, fotovoltaico, trattamentoAcque, pompeIdrauliche }) {
+export default function RelazioneCalcolo({ scenari, scenarioProgetto, comune, acs, branding, tipiImpianto, sistemaCentralizzato, solareTermico, fotovoltaico, trattamentoAcque, pompeIdrauliche }) {
   const mostraClima = tipiImpianto.climatizzazione;
   const mostraAcs = tipiImpianto.acs;
   const mostraTrattamentoAcque = tipiImpianto.trattamentoAcque;
   const mostraPompeIdrauliche = tipiImpianto.pompeIdrauliche;
 
+  // Prodotto consigliato e preventivo si riferiscono sempre e solo alla
+  // situazione che l'utente ha indicato di voler realizzare: le altre
+  // sono alternative escluse, non fanno parte della fornitura.
+  const scenarioDaPreventivare = scenarioProgetto || scenari[0] || null;
+  const confrontoAttivo = scenari.length > 1;
+
   const vociRiepilogo = calcolaVociRiepilogoProdotti({
     tipiImpianto,
-    scenario: scenari[0] || null,
+    scenario: scenarioDaPreventivare,
     comune,
     acs,
     sistemaCentralizzato,
@@ -54,69 +60,97 @@ export default function RelazioneCalcolo({ scenari, comune, acs, branding, tipiI
     pompeIdrauliche,
   });
 
-  return (
-    <div className="space-y-8">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 no-print">
-        <p className="text-xs text-slate-400">
-          La relazione include il dettaglio di calcolo di ogni categoria attivata
-          {[mostraClima && "climatizzazione", mostraAcs && "ACS", mostraTrattamentoAcque && "trattamento acque", mostraPompeIdrauliche && "pompe idrauliche"]
-            .filter(Boolean)
-            .reduce((acc, cat, i, arr) => acc + (i === 0 ? ` (${cat}` : i === arr.length - 1 ? ` e ${cat})` : `, ${cat}`), "")}
-          , con i riferimenti normativi. Usa il pulsante per esportarla in PDF o stamparla.
-        </p>
-        <button
-          onClick={() => window.print()}
-          className="shrink-0 px-4 py-2 rounded-lg bg-slate-800 text-white text-sm font-semibold hover:bg-slate-700 transition-colors active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-brand-400"
-        >
-          🖨️ Stampa / Esporta relazione (PDF)
-        </button>
+  // Ogni scheda è un blocco di JSX: raggruppa le sezioni che rispondono
+  // alla stessa domanda dell'utente, invece di srotolarle tutte in un
+  // unico scorrimento in cui "quanto costa" e "come l'hai calcolato"
+  // stanno alla stessa distanza.
+  const schedaCosaTiServe = (
+    <>
+      <RiepilogoSceltaProdotti
+        voci={vociRiepilogo}
+        nomeScenario={mostraClima && confrontoAttivo ? scenarioDaPreventivare?.nome : null}
+      />
+      <div className="no-print">
+        <RichiediPreventivo
+          prodottiConsigliati={prodottiSelezionabiliDaVoci(vociRiepilogo)}
+          edificio={mostraClima && scenarioDaPreventivare ? scenarioDaPreventivare.edificio : EDIFICIO_VUOTO}
+          comune={comune}
+          branding={branding}
+          evidenziato={true}
+        />
       </div>
+    </>
+  );
 
-      <IntestazioneStampa branding={branding} comune={comune} titolo="Relazione di calcolo" sottotitolo="Dimensionamento impianto residenziale" />
+  const schedaNumeri = (
+    <>
+      {mostraClima && confrontoAttivo && scenarioDaPreventivare && (
+        <ConfrontoScenari scenari={scenari} scenarioDaPreventivare={scenarioDaPreventivare} />
+      )}
+      {mostraClima &&
+        scenari.map((scenario) => (
+          <section key={scenario.id} className="space-y-4">
+            <TitoloScenario scenario={scenario} confrontoAttivo={confrontoAttivo} scenarioDaPreventivare={scenarioDaPreventivare} />
+            <div className="grid sm:grid-cols-4 gap-3">
+              <RiepilogoCard
+                accento="invernale"
+                label="Fabbisogno invernale totale"
+                value={formattaKw(scenario.edificio.totaleInvernaleKw)}
+                sotto={formattaBtu(scenario.edificio.totaleInvernaleBtu)}
+              />
+              <RiepilogoCard
+                accento="estivo"
+                label="Fabbisogno estivo totale"
+                value={formattaKw(scenario.edificio.totaleEstivoKw)}
+                sotto={`${formattaBtu(scenario.edificio.totaleEstivoBtu)} · ${formattaFrigorie(scenario.edificio.totaleEstivoKw)}`}
+              />
+              <RiepilogoCard
+                accento="superficie"
+                label="Superficie totale"
+                value={`${scenario.edificio.superficieTotale.toFixed(1)} m²`}
+                sotto={`Zona ${comune.zona} — ${ZONE_CLIMATICHE[comune.zona].oreRiscaldamento} h/giorno, ${ZONE_CLIMATICHE[comune.zona].periodo}`}
+              />
+              <RiepilogoCard
+                accento="co2"
+                label="CO2 stimata"
+                value={`${Math.round(
+                  calcolaCO2Annua(
+                    stimaConsumoAnnuoClimatizzazione({
+                      totaleInvernaleKw: scenario.edificio.totaleInvernaleKw,
+                      totaleEstivoKw: scenario.edificio.totaleEstivoKw,
+                      comune,
+                    }).consumoAnnuoKwh,
+                    "elettrico"
+                  )
+                ).toLocaleString("it-IT")} kg/anno`}
+                sotto="Classe rappresentativa A++, mix elettrico medio IT"
+              />
+            </div>
+            <AnalisiCritica edificio={scenario.edificio} />
+            <FotovoltaicoDettaglio edificio={scenario.edificio} comune={comune} fotovoltaico={fotovoltaico} />
+          </section>
+        ))}
+      {mostraAcs && <SolareTermicoDettaglio acs={acs} solareTermico={solareTermico} />}
+    </>
+  );
 
-      <RiepilogoSceltaProdotti voci={vociRiepilogo} />
-
+  const schedaComeCalcolato = (
+    <>
       {mostraClima &&
         scenari.map((scenario) => {
           const mostraSplit = sistemaCentralizzato.tipo === "nessuno" || scenario.edificio.risultatiAmbienti.length < 2;
           return (
-          <section key={scenario.id} className="space-y-4 print-break">
-            <h2 className="text-xl font-bold text-slate-800">Scenario: {scenario.nome}</h2>
-
-            <div className="grid sm:grid-cols-4 gap-3">
-              <RiepilogoCard accento="invernale" label="Fabbisogno invernale totale" value={formattaKw(scenario.edificio.totaleInvernaleKw)} sotto={mostraSplit ? formattaBtu(scenario.edificio.totaleInvernaleBtu) : null} />
-              <RiepilogoCard accento="estivo" label="Fabbisogno estivo totale" value={formattaKw(scenario.edificio.totaleEstivoKw)} sotto={mostraSplit ? formattaBtu(scenario.edificio.totaleEstivoBtu) : null} />
-              <RiepilogoCard accento="superficie" label="Superficie totale" value={`${scenario.edificio.superficieTotale.toFixed(1)} m²`} sotto={`Zona ${comune.zona} — ${ZONE_CLIMATICHE[comune.zona].oreRiscaldamento} h/giorno, ${ZONE_CLIMATICHE[comune.zona].periodo}`} />
-              <RiepilogoCard accento="co2" label="CO2 stimata" value={`${Math.round(calcolaCO2Annua(stimaConsumoAnnuoClimatizzazione({ totaleInvernaleKw: scenario.edificio.totaleInvernaleKw, totaleEstivoKw: scenario.edificio.totaleEstivoKw, comune }).consumoAnnuoKwh, "elettrico")).toLocaleString("it-IT")} kg/anno`} sotto="Classe rappresentativa A++, mix elettrico medio IT" />
-            </div>
-
-            <AnalisiCritica edificio={scenario.edificio} />
-
-            <div className="space-y-3">
-              <h3 className="font-semibold text-slate-800">Dettaglio calcolo tecnico per ambiente</h3>
-              {scenario.edificio.risultatiAmbienti.map((r) => (
-                <DettaglioCalcolo key={r.ambiente.id} risultato={r} comune={comune} defaultOpen={true} mostraBtu={mostraSplit} />
-              ))}
-            </div>
-
-            {mostraSplit && (
-              <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
-                <h3 className="font-semibold text-slate-800">Catalogo tecnico comparativo — climatizzazione</h3>
-                <p className="text-xs text-slate-400">
-                  Selezione basata sul fabbisogno di dimensionamento (massimo tra carico invernale ed estivo):{" "}
-                  {formattaKw(Math.max(scenario.edificio.totaleInvernaleKw, scenario.edificio.totaleEstivoKw))}.
-                </p>
-                <CatalogoTabella
-                  fabbisognoKw={Math.max(scenario.edificio.totaleInvernaleKw, scenario.edificio.totaleEstivoKw)}
-                  tipo="climatizzatore_split"
-                />
+            <section key={scenario.id} className="space-y-4 print-break">
+              <TitoloScenario scenario={scenario} confrontoAttivo={confrontoAttivo} scenarioDaPreventivare={scenarioDaPreventivare} />
+              <div className="space-y-3">
+                <h3 className="font-semibold text-slate-800">Dettaglio calcolo tecnico per ambiente</h3>
+                {scenario.edificio.risultatiAmbienti.map((r) => (
+                  <DettaglioCalcolo key={r.ambiente.id} risultato={r} comune={comune} defaultOpen={true} mostraBtu={mostraSplit} />
+                ))}
               </div>
-            )}
-
-            <VRFDettaglio risultatiAmbienti={scenario.edificio.risultatiAmbienti} sistemaCentralizzato={sistemaCentralizzato} comune={comune} />
-            <ChillerDettaglio risultatiAmbienti={scenario.edificio.risultatiAmbienti} sistemaCentralizzato={sistemaCentralizzato} comune={comune} />
-            <FotovoltaicoDettaglio edificio={scenario.edificio} comune={comune} fotovoltaico={fotovoltaico} />
-          </section>
+              <VRFDettaglio risultatiAmbienti={scenario.edificio.risultatiAmbienti} sistemaCentralizzato={sistemaCentralizzato} comune={comune} mostraCatalogo={false} />
+              <ChillerDettaglio risultatiAmbienti={scenario.edificio.risultatiAmbienti} sistemaCentralizzato={sistemaCentralizzato} comune={comune} mostraCatalogo={false} />
+            </section>
           );
         })}
 
@@ -126,10 +160,7 @@ export default function RelazioneCalcolo({ scenari, comune, acs, branding, tipiI
           <BollitoreDettaglio acs={acs} />
         </section>
       )}
-
       {mostraAcs && <PompaCaloreAcsDettaglio acs={acs} comune={comune} />}
-
-      {mostraAcs && <SolareTermicoDettaglio acs={acs} solareTermico={solareTermico} />}
 
       {mostraTrattamentoAcque && (
         <section className="print-break">
@@ -144,18 +175,183 @@ export default function RelazioneCalcolo({ scenari, comune, acs, branding, tipiI
       )}
 
       <DisclaimerBox />
+    </>
+  );
 
-      <div className="no-print">
-        <RichiediPreventivo
-          prodottiConsigliati={prodottiSelezionabiliDaVoci(vociRiepilogo)}
-          edificio={mostraClima && scenari[0] ? scenari[0].edificio : EDIFICIO_VUOTO}
-          comune={comune}
-          branding={branding}
-          evidenziato={true}
-        />
+  const schedaAlternative = (
+    <>
+      {mostraClima &&
+        scenari.map((scenario) => {
+          const mostraSplit = sistemaCentralizzato.tipo === "nessuno" || scenario.edificio.risultatiAmbienti.length < 2;
+          const fabbisognoKw = Math.max(scenario.edificio.totaleInvernaleKw, scenario.edificio.totaleEstivoKw);
+          return (
+            <section key={scenario.id} className="space-y-4 print-break">
+              <TitoloScenario scenario={scenario} confrontoAttivo={confrontoAttivo} scenarioDaPreventivare={scenarioDaPreventivare} />
+              {mostraSplit ? (
+                <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+                  <h3 className="font-semibold text-slate-800">Catalogo tecnico comparativo — climatizzazione</h3>
+                  <p className="text-xs text-slate-400">
+                    Selezione basata sul fabbisogno di dimensionamento (massimo tra carico invernale ed estivo):{" "}
+                    {formattaKw(fabbisognoKw)}.
+                  </p>
+                  <CatalogoTabella fabbisognoKw={fabbisognoKw} tipo="climatizzatore_split" />
+                </div>
+              ) : (
+                <>
+                  <VRFDettaglio risultatiAmbienti={scenario.edificio.risultatiAmbienti} sistemaCentralizzato={sistemaCentralizzato} comune={comune} compatto={true} />
+                  <ChillerDettaglio risultatiAmbienti={scenario.edificio.risultatiAmbienti} sistemaCentralizzato={sistemaCentralizzato} comune={comune} compatto={true} />
+                </>
+              )}
+            </section>
+          );
+        })}
+    </>
+  );
+
+  const schede = [
+    { chiave: "serve", etichetta: "Cosa ti serve", icona: "🛒", sottotitolo: "Prodotti consigliati e richiesta di preventivo", contenuto: schedaCosaTiServe },
+    { chiave: "numeri", etichetta: "Numeri e risparmio", icona: "📊", sottotitolo: "Fabbisogni, consumi, CO2 e confronti", contenuto: schedaNumeri },
+    { chiave: "calcolo", etichetta: "Come l'abbiamo calcolato", icona: "📐", sottotitolo: "Ogni passaggio, coefficiente e norma applicata", contenuto: schedaComeCalcolato },
+    ...(mostraClima ? [{ chiave: "alternative", etichetta: "Alternative a catalogo", icona: "🔍", sottotitolo: "Altri modelli idonei al fabbisogno calcolato", contenuto: schedaAlternative }] : []),
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 no-print">
+        <p className="text-xs text-slate-400">
+          Tutte le schede finiscono comunque nel PDF: la suddivisione serve solo a leggere a schermo.
+        </p>
+        <button
+          onClick={() => window.print()}
+          className="shrink-0 px-4 py-2 rounded-lg bg-slate-800 text-white text-sm font-semibold hover:bg-slate-700 transition-colors active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-brand-400"
+        >
+          🖨️ Stampa / Esporta relazione completa (PDF)
+        </button>
       </div>
 
+      <IntestazioneStampa branding={branding} comune={comune} titolo="Relazione di calcolo" sottotitolo="Dimensionamento impianto residenziale" />
+
+      <Schede schede={schede} />
+
       <FooterBranding nomeAzienda={branding.nomeAzienda} />
+    </div>
+  );
+}
+
+/**
+ * Navigazione a schede dell'output.
+ *
+ * Le schede non attive restano nel DOM e vengono nascoste solo a schermo:
+ * in stampa tornano tutte visibili, così il PDF resta la relazione
+ * integrale a prescindere dalla scheda aperta al momento del comando di
+ * stampa. Nasconderle smontandole dal DOM produrrebbe un PDF parziale
+ * senza che l'utente se ne accorga.
+ */
+function Schede({ schede }) {
+  const [attiva, setAttiva] = React.useState(schede[0].chiave);
+  const schedaAttiva = schede.find((s) => s.chiave === attiva) || schede[0];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-2 no-print" role="tablist">
+        {schede.map((s) => {
+          const selezionata = s.chiave === schedaAttiva.chiave;
+          return (
+            <button
+              key={s.chiave}
+              role="tab"
+              aria-selected={selezionata}
+              onClick={() => setAttiva(s.chiave)}
+              className={`px-4 py-2 rounded-xl text-sm font-semibold border-2 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-400 ${
+                selezionata
+                  ? "bg-brand-600 border-brand-600 text-white shadow-sm"
+                  : "bg-white border-slate-200 text-slate-600 hover:border-brand-400 hover:text-brand-700"
+              }`}
+            >
+              <span className="mr-1.5">{s.icona}</span>
+              {s.etichetta}
+            </button>
+          );
+        })}
+      </div>
+
+      <p className="text-xs text-slate-400 no-print">{schedaAttiva.sottotitolo}</p>
+
+      {schede.map((s) => (
+        <div key={s.chiave} className={s.chiave === schedaAttiva.chiave ? "space-y-6" : "space-y-6 solo-stampa"}>
+          <h2 className="hidden print:block text-xl font-bold text-slate-800">{s.etichetta}</h2>
+          {s.contenuto}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Intestazione di scenario, ripetuta in ogni scheda per non perdere il riferimento passando da una all'altra. */
+function TitoloScenario({ scenario, confrontoAttivo, scenarioDaPreventivare }) {
+  return (
+    <h2 className="text-xl font-bold text-slate-800 flex flex-wrap items-center gap-2">
+      <span>{confrontoAttivo ? `Situazione: ${scenario.nome}` : "Calcolo del fabbisogno"}</span>
+      {confrontoAttivo && scenario.id === scenarioDaPreventivare?.id && (
+        <span className="text-[11px] font-bold uppercase tracking-wide bg-brand-600 text-white px-2 py-0.5 rounded-full">
+          Da realizzare — è questa che viene preventivata
+        </span>
+      )}
+    </h2>
+  );
+}
+
+/**
+ * Confronto dei totali fra le situazioni messe a paragone: è il motivo
+ * per cui gli scenari esistono (quanto fa risparmiare l'intervento), e
+ * dice a chiare lettere quale delle due viene poi preventivata.
+ */
+function ConfrontoScenari({ scenari, scenarioDaPreventivare }) {
+  const riferimento = scenari[0];
+  return (
+    <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3">
+      <div>
+        <h2 className="font-bold text-lg text-slate-800">Confronto tra le situazioni</h2>
+        <p className="text-xs text-slate-400 mt-0.5">
+          Differenza di fabbisogno rispetto a “{riferimento.nome}”. Il preventivo riguarda solo la situazione
+          indicata come da realizzare.
+        </p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-xs text-slate-400 text-left">
+              <th className="font-medium py-1 pr-3">Situazione</th>
+              <th className="font-medium py-1 pr-3 text-right">Invernale</th>
+              <th className="font-medium py-1 pr-3 text-right">Estivo</th>
+              <th className="font-medium py-1 text-right">Differenza invernale</th>
+            </tr>
+          </thead>
+          <tbody>
+            {scenari.map((sc) => {
+              const delta = sc.edificio.totaleInvernaleKw - riferimento.edificio.totaleInvernaleKw;
+              const daPreventivare = sc.id === scenarioDaPreventivare.id;
+              return (
+                <tr key={sc.id} className={`border-t border-slate-100 ${daPreventivare ? "bg-brand-50/50" : ""}`}>
+                  <td className="py-2 pr-3 font-medium text-slate-800">
+                    {sc.nome}
+                    {daPreventivare && <span className="ml-2 text-[11px] font-bold text-brand-700">← da realizzare</span>}
+                  </td>
+                  <td className="py-2 pr-3 text-right tabular-nums">{formattaKw(sc.edificio.totaleInvernaleKw)}</td>
+                  <td className="py-2 pr-3 text-right tabular-nums">{formattaKw(sc.edificio.totaleEstivoKw)}</td>
+                  <td className={`py-2 text-right tabular-nums ${delta < 0 ? "text-emerald-600" : delta > 0 ? "text-amber-600" : "text-slate-400"}`}>
+                    {sc.id === riferimento.id
+                      ? "—"
+                      : delta === 0
+                      ? "nessuna differenza"
+                      : `${delta > 0 ? "+" : ""}${formattaKw(delta)}`}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

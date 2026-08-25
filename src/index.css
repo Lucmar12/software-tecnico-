@@ -12,10 +12,20 @@ body {
   @apply bg-slate-100 text-slate-800 antialiased;
 }
 
+/* Sezioni presenti nel DOM ma riservate alla stampa: sono le schede
+   dell'output non attive a schermo. Restano montate perché il PDF deve
+   essere la relazione integrale, qualunque scheda sia aperta. */
+.solo-stampa {
+  display: none;
+}
+
 /* Stile per la stampa della Relazione di calcolo / Preventivo */
 @media print {
   .no-print {
     display: none !important;
+  }
+  .solo-stampa {
+    display: block !important;
   }
   .print-break {
     page-break-before: always;

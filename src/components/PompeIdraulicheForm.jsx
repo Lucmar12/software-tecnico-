@@ -1,5 +1,11 @@
 import React from "react";
-import { PRESSIONE_RESIDUA_MINIMA_BAR_DEFAULT, PERDITE_CARICO_PCT_DEFAULT, CONSUMO_LITRI_PERSONA_GIORNO_DEFAULT } from "../utils/pompeIdrauliche.js";
+import {
+  PRESSIONE_RESIDUA_MINIMA_BAR_DEFAULT,
+  PERDITE_CARICO_PCT_DEFAULT,
+  CONSUMO_LITRI_PERSONA_GIORNO_DEFAULT,
+  NUMERO_BAGNI_DEFAULT,
+  calcolaPortataPunta,
+} from "../utils/pompeIdrauliche.js";
 
 const inputCls = "mt-1 w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-brand-400";
 
@@ -15,6 +21,15 @@ export default function PompeIdraulicheForm({ pompeIdrauliche, onChange }) {
   const autoclave = pompeIdrauliche.autoclave;
   const sollevamento = pompeIdrauliche.sollevamento;
   const circolazione = pompeIdrauliche.circolazione;
+  const numeroBagni = autoclave.numeroBagni ?? NUMERO_BAGNI_DEFAULT;
+  const haLavatrice = autoclave.haLavatrice ?? true;
+  // Anteprima immediata della portata che l'autoclave dovrà garantire, così
+  // che l'effetto di "un bagno in più" sia visibile mentre lo si dichiara.
+  const punta = calcolaPortataPunta({ numeroBagni, haLavatrice });
+
+  function setAutoclave(campi) {
+    onChange({ ...pompeIdrauliche, autoclave: { ...autoclave, ...campi } });
+  }
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-4">
@@ -22,7 +37,7 @@ export default function PompeIdraulicheForm({ pompeIdrauliche, onChange }) {
 
       <div className="space-y-3">
         <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Autoclave (gruppo di pressurizzazione)</span>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <label className="block">
             <span className="text-xs font-medium text-slate-500">Numero persone in abitazione</span>
             <input
@@ -30,7 +45,7 @@ export default function PompeIdraulicheForm({ pompeIdrauliche, onChange }) {
               min="1"
               className={inputCls}
               value={autoclave.numeroPersone}
-              onChange={(e) => onChange({ ...pompeIdrauliche, autoclave: { ...autoclave, numeroPersone: Number(e.target.value) } })}
+              onChange={(e) => setAutoclave({ numeroPersone: Number(e.target.value) })}
             />
           </label>
           <label className="block">
@@ -40,10 +55,30 @@ export default function PompeIdraulicheForm({ pompeIdrauliche, onChange }) {
               min="1"
               className={inputCls}
               value={autoclave.numeroPiani}
-              onChange={(e) => onChange({ ...pompeIdrauliche, autoclave: { ...autoclave, numeroPiani: Number(e.target.value) } })}
+              onChange={(e) => setAutoclave({ numeroPiani: Number(e.target.value) })}
             />
           </label>
+          <label className="block">
+            <span className="text-xs font-medium text-slate-500">Quanti bagni ci sono?</span>
+            <input
+              type="number"
+              min="1"
+              className={inputCls}
+              value={numeroBagni}
+              onChange={(e) => setAutoclave({ numeroBagni: Number(e.target.value) })}
+            />
+            <span className="text-[11px] text-slate-400">Lavabo, vaso, bidet e doccia per ciascun bagno</span>
+          </label>
         </div>
+        <label className="flex items-center gap-2 text-xs text-slate-600">
+          <input type="checkbox" checked={haLavatrice} onChange={(e) => setAutoclave({ haLavatrice: e.target.checked })} />
+          In casa c'è la lavatrice
+        </label>
+        <p className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-lg p-2">
+          Con {numeroBagni} {numeroBagni === 1 ? "bagno" : "bagni"}, cucina{haLavatrice ? " e lavatrice" : ""} l'impianto ha{" "}
+          <strong>{punta.numeroApparecchi} apparecchi</strong>: l'autoclave dovrà garantire{" "}
+          <strong>{punta.portataPuntaMc.toFixed(2)} m³/h</strong> ({punta.portataPuntaLmin.toFixed(0)} l/min).
+        </p>
         <div className="grid sm:grid-cols-3 gap-3 bg-slate-50 border border-slate-200 rounded-lg p-3">
             <label className="block">
               <span className="text-xs font-medium text-slate-500">Pressione residua minima [bar]</span>
@@ -53,7 +88,7 @@ export default function PompeIdraulicheForm({ pompeIdrauliche, onChange }) {
                 min="0.5"
                 className={inputCls}
                 value={autoclave.pressioneResiduaBar ?? PRESSIONE_RESIDUA_MINIMA_BAR_DEFAULT}
-                onChange={(e) => onChange({ ...pompeIdrauliche, autoclave: { ...autoclave, pressioneResiduaBar: Number(e.target.value) } })}
+                onChange={(e) => setAutoclave({ pressioneResiduaBar: Number(e.target.value) })}
               />
               <span className="text-[11px] text-slate-400">Default {PRESSIONE_RESIDUA_MINIMA_BAR_DEFAULT} bar (UNI 9182)</span>
             </label>
@@ -64,7 +99,7 @@ export default function PompeIdraulicheForm({ pompeIdrauliche, onChange }) {
                 min="0"
                 className={inputCls}
                 value={autoclave.perditeCaricoPct ?? PERDITE_CARICO_PCT_DEFAULT}
-                onChange={(e) => onChange({ ...pompeIdrauliche, autoclave: { ...autoclave, perditeCaricoPct: Number(e.target.value) } })}
+                onChange={(e) => setAutoclave({ perditeCaricoPct: Number(e.target.value) })}
               />
             </label>
             <label className="block">
@@ -74,7 +109,7 @@ export default function PompeIdraulicheForm({ pompeIdrauliche, onChange }) {
                 min="1"
                 className={inputCls}
                 value={autoclave.consumoLitriPersonaGiorno ?? CONSUMO_LITRI_PERSONA_GIORNO_DEFAULT}
-                onChange={(e) => onChange({ ...pompeIdrauliche, autoclave: { ...autoclave, consumoLitriPersonaGiorno: Number(e.target.value) } })}
+                onChange={(e) => setAutoclave({ consumoLitriPersonaGiorno: Number(e.target.value) })}
               />
             </label>
         </div>

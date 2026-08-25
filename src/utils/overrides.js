@@ -32,6 +32,8 @@ import {
   MAGGIORAZIONE_PONTI_TERMICI_PER_EPOCA,
   FATTORE_B_LOCALE_NON_RISCALDATO,
   INCREMENTO_SOLE_ARIA_PER_ESPOSIZIONE,
+  COEFF_CALORE_LATENTE_W_PER_MCH_G,
+  DELTA_UMIDITA_SPECIFICA_G_KG,
   kwToBtu,
   scegliTagliaCommerciale,
 } from "../data/calculations.js";
@@ -110,11 +112,22 @@ export function calcolaAmbienteConOverride(ambiente, comune) {
   const Q_solare = ambiente.superficieFinestre * APPORTO_SOLARE[ambiente.esposizionePrevalente] * 0.5;
   const Q_persone = ambiente.numeroOccupanti * 130;
   const Q_apparecchi = ambiente.superficiePavimento * 8;
-  const Q_ventEst = 0.34 * ricambiAriaOra * volumeAmbiente * deltaTEst;
+  const portataRinnovoMch = ricambiAriaOra * volumeAmbiente; // [m³/h]
+  const Q_ventEstSensibile = 0.34 * portataRinnovoMch * deltaTEst;
+  // Quota latente: deumidificazione dell'aria di rinnovo. Omessa nel
+  // calcolo sensibile puro, ma parte del carico totale a cui è dichiarata
+  // la potenza frigorifera delle macchine.
+  const Q_ventEstLatente = COEFF_CALORE_LATENTE_W_PER_MCH_G * portataRinnovoMch * DELTA_UMIDITA_SPECIFICA_G_KG;
+  const Q_ventEst = Q_ventEstSensibile + Q_ventEstLatente;
   const estivoKw = ((Q_trasmEst + Q_solare + Q_persone + Q_apparecchi + Q_ventEst) * 1.1) / 1000;
 
   const fabbisognoDimensionamento = Math.max(invernaleKw, estivoKw);
   const totaleW = trasmissioneW + ventilazioneW || 1;
+  // Le percentuali delle componenti d'involucro vanno rapportate alla somma
+  // delle componenti stesse, non al totale comprensivo di ventilazione e dei
+  // fattori applicati a valle: diversamente non sommano a 100 e la
+  // scomposizione diventa illeggibile.
+  const totaleComponentiW = Q_muri + Q_vetri + Q_tetto + Q_pavimento || 1;
 
   return {
     ambiente,
@@ -126,6 +139,16 @@ export function calcolaAmbienteConOverride(ambiente, comune) {
     maggiorazionePontiTermici,
     frazioneNonRiscaldata,
     incrementoSoleAria,
+    portataRinnovoMch,
+    scomposizioneEstiva: {
+      trasmissioneKw: Q_trasmEst / 1000,
+      solareKw: Q_solare / 1000,
+      personeKw: Q_persone / 1000,
+      apparecchiKw: Q_apparecchi / 1000,
+      ventilazioneSensibileKw: Q_ventEstSensibile / 1000,
+      ventilazioneLatenteKw: Q_ventEstLatente / 1000,
+      deltaUmiditaGKg: DELTA_UMIDITA_SPECIFICA_G_KG,
+    },
     invernaleKw,
     estivoKw,
     invernaleBtu: kwToBtu(invernaleKw),
@@ -142,10 +165,10 @@ export function calcolaAmbienteConOverride(ambiente, comune) {
       quotaVentilazionePct: (ventilazioneW / totaleW) * 100,
     },
     componentiInvolucro: {
-      muri: { kw: Q_muri / 1000, pct: (Q_muri / totaleW) * 100 },
-      vetri: { kw: Q_vetri / 1000, pct: (Q_vetri / totaleW) * 100 },
-      tetto: { kw: Q_tetto / 1000, pct: (Q_tetto / totaleW) * 100 },
-      pavimento: { kw: Q_pavimento / 1000, pct: (Q_pavimento / totaleW) * 100 },
+      muri: { kw: Q_muri / 1000, pct: (Q_muri / totaleComponentiW) * 100 },
+      vetri: { kw: Q_vetri / 1000, pct: (Q_vetri / totaleComponentiW) * 100 },
+      tetto: { kw: Q_tetto / 1000, pct: (Q_tetto / totaleComponentiW) * 100 },
+      pavimento: { kw: Q_pavimento / 1000, pct: (Q_pavimento / totaleComponentiW) * 100 },
     },
   };
 }

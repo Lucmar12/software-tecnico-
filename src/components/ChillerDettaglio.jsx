@@ -31,7 +31,13 @@ export default function ChillerDettaglio({ risultatiAmbienti, sistemaCentralizza
       </p>
       <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
         <Riga label="Terminali serviti (ventilconvettori/pannelli)" value={d.numeroTerminali} />
-        <Riga label="Somma fabbisogni ambienti" value={formattaKw(d.sommaFabbisogniKw)} />
+        <Riga label="Totale invernale edificio" value={formattaKw(d.totaleInvernaleKw)} />
+        <Riga label="Totale estivo edificio" value={formattaKw(d.totaleEstivoKw)} />
+        <Riga
+          label="Fabbisogno dimensionante"
+          value={formattaKw(d.sommaFabbisogniKw)}
+          nota={`il maggiore fra i due totali — stagione ${d.stagioneDimensionante}`}
+        />
         <Riga label="Fattore di contemporaneità" value={`× ${d.fattoreContemporaneita}`} />
         <Riga label="Potenza richiesta (a condizioni reali)" value={<strong>{formattaKw(d.potenzaRichiestaKw)}</strong>} />
         {comune && (

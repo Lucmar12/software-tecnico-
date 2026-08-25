@@ -12,6 +12,14 @@ export function formattaBtu(v) {
   return `${Math.round(v).toLocaleString("it-IT")} BTU/h`;
 }
 
+/** Frigorie/ora per kW (1 frig/h = 1 kcal/h sottratta). Unità ancora corrente nel commerciale del freddo. */
+const FRIGORIE_PER_KW = 860;
+
+/** Potenza frigorifera espressa in frigorie/ora, unità commerciale corrente affiancata ai kW. */
+export function formattaFrigorie(kw) {
+  return `${Math.round(kw * FRIGORIE_PER_KW).toLocaleString("it-IT")} frig/h`;
+}
+
 export function formattaEuro(v) {
   return v.toLocaleString("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
 }
