@@ -49,7 +49,10 @@ export default function AmbientiList({ ambienti, onChange }) {
   function aggiungiAmbiente() {
     const ambiente = nuovoAmbiente({ nome: `Ambiente ${ambienti.length + 1}` });
     onChange([...ambienti, ambiente]);
-    setApertiIds([...apertiIds, ambiente.id]);
+    // Resta aperto solo l'ambiente appena creato: è quello su cui si sta
+    // lavorando. Lasciare aperti anche i precedenti riporta la pagina alla
+    // colonna infinita di campi che il riepilogo richiudibile evita.
+    setApertiIds([ambiente.id]);
   }
 
   function toggle(id) {
