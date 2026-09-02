@@ -1,24 +1,115 @@
 import React, { useState } from "react";
 import { OPZIONI_ESPOSIZIONE, OPZIONI_EPOCA, OPZIONI_TIPO_LOCALE } from "../utils/modelli.js";
-import { ETICHETTE_CAMPI, CAMPI_STIMABILI, OPZIONI_PARETI_ESTERNE, applicaStime } from "../utils/stime.js";
+import { ETICHETTE_CAMPI, OPZIONI_PARETI_ESTERNE, TIPI_FINESTRA, areaFinestra, sviluppoParetiEsterne, applicaStime } from "../utils/stime.js";
+import { PARAMETRI_CALCOLO, parametro, parametroDefault, parametriPerGruppo, parametriSovrascritti } from "../utils/parametriCalcolo.js";
 import { validaAmbiente } from "../utils/validazione.js";
 import { TRASMITTANZE_PER_EPOCA } from "../data/calculations.js";
 
-function Campo({ label, children, errore, stimato, nota, onRipristinaStima }) {
+/**
+ * Pannello di tutti i coefficienti che entrano nel calcolo dell'ambiente.
+ *
+ * Ogni campo parte dal valore normativo o di pratica corrente già
+ * compilato, mostra la propria unità di misura e dichiara la fonte da
+ * cui proviene. Chi ha il dato reale — una diagnosi energetica, il
+ * bulbo umido del comune, l'affollamento effettivo — lo scrive e il
+ * calcolo smette di essere una convenzione. Chi non lo tocca ottiene
+ * comunque un risultato verosimile.
+ *
+ * Le costanti fisiche (capacità termica e calore latente dell'aria,
+ * calore specifico dell'acqua) non compaiono qui di proposito: non sono
+ * scelte di progetto.
+ */
+function PannelloParametri({ ambiente, onChange }) {
+  const inseriti = ambiente.parametri || {};
+
+  function impostaParametro(chiave, valore) {
+    const parametri = { ...inseriti };
+    if (valore === "" || valore == null) delete parametri[chiave];
+    else parametri[chiave] = Number(valore);
+    onChange({ ...ambiente, parametri });
+  }
+
+  function ripristinaTutti() {
+    const { parametri, ...resto } = ambiente;
+    onChange(resto);
+  }
+
+  const quantiModificati = PARAMETRI_CALCOLO.filter((p) => inseriti[p.chiave] != null).length;
+
+  return (
+    <div className="pt-3 mt-1 border-t border-amber-200 space-y-3">
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-[11px] text-amber-800">
+          Coefficienti applicati a questo ambiente. Sono già compilati con il valore normativo: modificane uno solo
+          se disponi del dato reale.
+        </p>
+        {quantiModificati > 0 && (
+          <button onClick={ripristinaTutti} className="text-[11px] text-brand-700 underline shrink-0">
+            Ripristina i valori normativi
+          </button>
+        )}
+      </div>
+
+      {parametriPerGruppo().map((gruppo) => (
+        <div key={gruppo.nome}>
+          <span className="text-[10px] font-bold uppercase tracking-wide text-amber-700">{gruppo.nome}</span>
+          <div className="grid sm:grid-cols-2 gap-2 mt-1">
+            {gruppo.parametri.map((p) => {
+              const predefinito = parametroDefault(ambiente, p.chiave);
+              const modificato = inseriti[p.chiave] != null;
+              return (
+                <label key={p.chiave} className="block text-[11px]">
+                  <span className="flex items-center gap-1 flex-wrap text-slate-600">
+                    {p.etichetta} [{p.unita}]
+                    {modificato && (
+                      <button
+                        type="button"
+                        onClick={() => impostaParametro(p.chiave, null)}
+                        className="text-[10px] text-brand-700 underline"
+                      >
+                        torna a {predefinito}
+                      </button>
+                    )}
+                  </span>
+                  <input
+                    type="number"
+                    step={p.passo}
+                    min={p.min}
+                    max={p.max}
+                    className={`${inputCls} ${modificato ? "border-brand-400 bg-brand-50/50" : "bg-white"}`}
+                    value={parametro(ambiente, p.chiave)}
+                    onChange={(e) => impostaParametro(p.chiave, e.target.value)}
+                  />
+                  <span className="text-[10px] text-slate-400 leading-tight block">{p.fonte}</span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * `badge` distingue i due casi che non vanno confusi: "calcolato" è un
+ * valore esatto derivato da ciò che l'utente ha dichiarato, "stimato" è
+ * una convenzione di progetto in mancanza del dato reale.
+ */
+function Campo({ label, children, errore, stimato, badge = "stimato", nota, onRipristinaStima }) {
+  const coloreBadge = badge === "calcolato" ? "bg-slate-100 text-slate-600" : "bg-amber-100 text-amber-800";
   return (
     <label className="block">
       <span className="text-xs font-medium text-slate-500 flex items-center gap-1 flex-wrap">
         {label}
-        {stimato && (
-          <span className="text-[10px] bg-amber-100 text-amber-800 px-1 rounded font-semibold">stimato</span>
-        )}
+        {stimato && <span className={`text-[10px] ${coloreBadge} px-1 rounded font-semibold`}>{badge}</span>}
         {!stimato && onRipristinaStima && (
           <button
             type="button"
             onClick={onRipristinaStima}
             className="text-[10px] text-brand-700 underline font-medium"
           >
-            torna alla stima
+            ricalcola automaticamente
           </button>
         )}
       </span>
@@ -32,6 +123,7 @@ function Campo({ label, children, errore, stimato, nota, onRipristinaStima }) {
 const inputCls =
   "mt-1 w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400";
 
+const inputCalcolatoCls = `${inputCls} bg-slate-50 border-slate-200`;
 const inputStimatoCls = `${inputCls} bg-amber-50/60 border-amber-200`;
 
 /**
@@ -65,7 +157,7 @@ export default function AmbienteForm({ ambiente, onChange, onRemove }) {
     onChange(applicaStime({ ...ambiente, [campo]: valore, campiStimati }));
   }
 
-  /** Rimette un campo sotto il controllo della stima automatica. */
+  /** Rimette un campo sotto il controllo del calcolo automatico. */
   function ripristinaStima(campo) {
     const campiStimati = [...new Set([...(ambiente.campiStimati || []), campo])];
     onChange(applicaStime({ ...ambiente, campiStimati }));
@@ -89,7 +181,8 @@ export default function AmbienteForm({ ambiente, onChange, onRemove }) {
     }
   }
 
-  const tuttiStimati = CAMPI_STIMABILI.every((c) => stimati.has(c));
+  const sviluppoM = sviluppoParetiEsterne(ambiente);
+  const sovrascritti = parametriSovrascritti(ambiente);
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
@@ -107,12 +200,25 @@ export default function AmbienteForm({ ambiente, onChange, onRemove }) {
       {errori.nome && <p className="text-[11px] text-red-600 -mt-2">{errori.nome}</p>}
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        <Campo label="Superficie pavimento [m²]" errore={errori.superficiePavimento}>
+        <Campo label="Lunghezza [m]" errore={errori.lunghezzaM} nota="il lato più lungo della stanza">
           <input
             type="number"
+            step="0.1"
+            min="0"
             className={inputCls}
-            value={ambiente.superficiePavimento}
-            onChange={(e) => set("superficiePavimento", Number(e.target.value))}
+            value={ambiente.lunghezzaM}
+            onChange={(e) => set("lunghezzaM", Number(e.target.value))}
+          />
+        </Campo>
+
+        <Campo label="Larghezza [m]" errore={errori.larghezzaM} nota={`superficie: ${(ambiente.superficiePavimento || 0).toFixed(2)} m²`}>
+          <input
+            type="number"
+            step="0.1"
+            min="0"
+            className={inputCls}
+            value={ambiente.larghezzaM}
+            onChange={(e) => set("larghezzaM", Number(e.target.value))}
           />
         </Campo>
 
@@ -136,15 +242,31 @@ export default function AmbienteForm({ ambiente, onChange, onRemove }) {
           </select>
         </Campo>
 
-        <Campo label="Pareti che danno sull'esterno" nota="Quanti lati dell'ambiente confinano con l'esterno">
-          <select
-            className={inputCls}
-            value={ambiente.paretiEsterne ?? 1}
-            onChange={(e) => set("paretiEsterne", Number(e.target.value))}
-          >
+        <Campo label="Quali lati danno sull'esterno" nota={`sviluppo esposto: ${sviluppoM.toFixed(2)} m`}>
+          <select className={inputCls} value={ambiente.paretiEsterne} onChange={(e) => set("paretiEsterne", e.target.value)}>
             {OPZIONI_PARETI_ESTERNE.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
+              </option>
+            ))}
+          </select>
+        </Campo>
+
+        <Campo label="Quante finestre" errore={errori.numeroFinestre}>
+          <input
+            type="number"
+            min="0"
+            className={inputCls}
+            value={ambiente.numeroFinestre}
+            onChange={(e) => set("numeroFinestre", Number(e.target.value))}
+          />
+        </Campo>
+
+        <Campo label="Tipo di serramento" nota={`${areaFinestra(ambiente.tipoFinestra).toFixed(2)} m² ciascuno`}>
+          <select className={inputCls} value={ambiente.tipoFinestra} onChange={(e) => set("tipoFinestra", e.target.value)}>
+            {TIPI_FINESTRA.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
               </option>
             ))}
           </select>
@@ -189,21 +311,21 @@ export default function AmbienteForm({ ambiente, onChange, onRemove }) {
 
       <div className="pt-3 border-t border-slate-100 space-y-2">
         <p className="text-[11px] text-slate-500">
-          {tuttiStimati
-            ? "I dati qui sotto sono calcolati automaticamente dai valori inseriti sopra: modificali solo se hai un rilievo o un progetto con le misure reali."
-            : "Dati di dettaglio. Quelli con il badge “stimato” sono calcolati dai valori inseriti sopra."}
+          Ricavati esattamente dai dati inseriti sopra — lati, altezza, lati esposti, numero e tipo di serramenti.
+          Sovrascrivili solo se hai il rilievo con le misure effettive.
         </p>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           <Campo
             label={`${ETICHETTE_CAMPI.superficieMuriEsterni} [m²]`}
             errore={errori.superficieMuriEsterni}
+            badge="calcolato"
             stimato={stimati.has("superficieMuriEsterni")}
-            nota={stimati.has("superficieMuriEsterni") ? "√superficie × altezza × pareti esterne" : null}
+            nota={stimati.has("superficieMuriEsterni") ? `${sviluppoM.toFixed(2)} m di sviluppo × ${ambiente.altezza} m di altezza` : null}
             onRipristinaStima={() => ripristinaStima("superficieMuriEsterni")}
           >
             <input
               type="number"
-              className={stimati.has("superficieMuriEsterni") ? inputStimatoCls : inputCls}
+              className={stimati.has("superficieMuriEsterni") ? inputCalcolatoCls : inputCls}
               value={ambiente.superficieMuriEsterni}
               onChange={(e) => set("superficieMuriEsterni", Number(e.target.value))}
             />
@@ -212,14 +334,15 @@ export default function AmbienteForm({ ambiente, onChange, onRemove }) {
           <Campo
             label={`${ETICHETTE_CAMPI.superficieFinestre} [m²]`}
             errore={errori.superficieFinestre}
+            badge="calcolato"
             stimato={stimati.has("superficieFinestre")}
-            nota={stimati.has("superficieFinestre") ? "rapporto aeroilluminante minimo di legge" : null}
+            nota={stimati.has("superficieFinestre") ? `${ambiente.numeroFinestre} × ${areaFinestra(ambiente.tipoFinestra).toFixed(2)} m²` : null}
             onRipristinaStima={() => ripristinaStima("superficieFinestre")}
           >
             <input
               type="number"
               step="0.1"
-              className={stimati.has("superficieFinestre") ? inputStimatoCls : inputCls}
+              className={stimati.has("superficieFinestre") ? inputCalcolatoCls : inputCls}
               value={ambiente.superficieFinestre}
               onChange={(e) => set("superficieFinestre", Number(e.target.value))}
             />
@@ -277,7 +400,12 @@ export default function AmbienteForm({ ambiente, onChange, onRemove }) {
               if (!nuovo) onChange({ ...ambiente, trasmittanzeOverride: null, teInvOverride: null, tbseOverride: null });
             }}
           >
-            {overrideAperto ? "Nascondi override coefficienti normativi" : "Sovrascrivi coefficienti normativi (dati da diagnosi energetica)"}
+            {overrideAperto ? "Nascondi i parametri di calcolo" : "Mostra tutti i parametri di calcolo (trasmittanze, temperature, coefficienti)"}
+            {sovrascritti.length > 0 && (
+              <span className="ml-2 text-[10px] bg-brand-100 text-brand-800 px-1.5 py-0.5 rounded font-semibold no-underline">
+                {sovrascritti.length} {sovrascritti.length === 1 ? "modificato" : "modificati"}
+              </span>
+            )}
           </button>
 
           {overrideAperto && (
@@ -337,6 +465,8 @@ export default function AmbienteForm({ ambiente, onChange, onRemove }) {
                   />
                 </label>
               </div>
+
+              <PannelloParametri ambiente={ambiente} onChange={onChange} />
             </div>
           )}
         </div>

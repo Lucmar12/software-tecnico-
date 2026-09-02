@@ -7,8 +7,16 @@ export function validaAmbiente(ambiente) {
 
   if (!ambiente.nome || !ambiente.nome.trim()) errori.nome = "Il nome dell'ambiente è obbligatorio.";
 
-  if (!(ambiente.superficiePavimento > 0)) errori.superficiePavimento = "Inserire una superficie di pavimento maggiore di zero.";
-  else if (ambiente.superficiePavimento > 200) errori.superficiePavimento = "Superficie non plausibile per un singolo ambiente residenziale (> 200 m²).";
+  if (!(ambiente.lunghezzaM > 0)) errori.lunghezzaM = "Inserire una lunghezza maggiore di zero.";
+  else if (ambiente.lunghezzaM > 30) errori.lunghezzaM = "Lunghezza non plausibile per un ambiente residenziale (> 30 m).";
+
+  if (!(ambiente.larghezzaM > 0)) errori.larghezzaM = "Inserire una larghezza maggiore di zero.";
+  else if (ambiente.larghezzaM > 30) errori.larghezzaM = "Larghezza non plausibile per un ambiente residenziale (> 30 m).";
+
+  if (ambiente.lunghezzaM > 0 && ambiente.larghezzaM > 0 && ambiente.lunghezzaM * ambiente.larghezzaM > 200)
+    errori.lunghezzaM = "Superficie non plausibile per un singolo ambiente residenziale (> 200 m²).";
+
+  if (!(ambiente.numeroFinestre >= 0)) errori.numeroFinestre = "Il numero di finestre non può essere negativo.";
 
   if (!(ambiente.altezza >= 2 && ambiente.altezza <= 4.5)) errori.altezza = "L'altezza interna deve essere compresa tra 2 e 4,5 m.";
 

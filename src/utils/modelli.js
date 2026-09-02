@@ -4,7 +4,7 @@
  * data/calculations.js; qui vivono solo le liste di opzioni per i form.
  */
 import { ETICHETTE_EPOCA, ETICHETTE_TIPO_LOCALE } from "../data/calculations.js";
-import { CAMPI_STIMABILI, applicaStime } from "./stime.js";
+import { CAMPI_STIMABILI, CONFIGURAZIONE_PARETI_DEFAULT, applicaStime } from "./stime.js";
 
 export const OPZIONI_ESPOSIZIONE = [
   { value: "nord", label: "Nord" },
@@ -41,9 +41,14 @@ export function nuovoAmbiente(overrides = {}) {
   return applicaStime({
     id: generaId(),
     nome: "Nuovo ambiente",
-    superficiePavimento: 14,
+    // La geometria si descrive con i lati: la superficie ne deriva.
+    lunghezzaM: 5,
+    larghezzaM: 4,
+    superficiePavimento: 20,
     altezza: 2.7,
-    paretiEsterne: 1,
+    paretiEsterne: CONFIGURAZIONE_PARETI_DEFAULT,
+    numeroFinestre: 1,
+    tipoFinestra: "portafinestraDue",
     superficieMuriEsterni: 0,
     superficieFinestre: 0,
     esposizionePrevalente: "sud",

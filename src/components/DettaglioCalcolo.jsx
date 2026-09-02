@@ -9,7 +9,7 @@ import {
   UMIDITA_SPECIFICA_INTERNA_G_KG,
   btuToKw,
 } from "../data/calculations.js";
-import { ETICHETTE_CAMPI } from "../utils/stime.js";
+import { ETICHETTE_CAMPI, CAMPI_CONVENZIONALI } from "../utils/stime.js";
 
 function Riga({ label, value, nota }) {
   return (
@@ -53,8 +53,11 @@ export default function DettaglioCalcolo({ risultato, comune, defaultOpen = fals
     scomposizioneEstiva,
   } = risultato;
 
-  // Dati dell'ambiente non misurati ma assunti per stima: vanno dichiarati in relazione.
-  const campiStimati = ambiente.campiStimati || [];
+  // Muri e finestre sono calcolati da dati dichiarati dall'utente (lati
+  // della stanza, serramenti): non sono stime e non vanno dichiarati tali.
+  // Resta convenzionale il solo affollamento, finché non viene inserito.
+  const campiStimati = (ambiente.campiStimati || []).filter((c) => CAMPI_CONVENZIONALI.includes(c));
+  const parametriInseriti = risultato.parametriSovrascritti || [];
 
   return (
     <div className="border border-slate-200 rounded-lg overflow-hidden">
@@ -75,22 +78,32 @@ export default function DettaglioCalcolo({ risultato, comune, defaultOpen = fals
 
           {campiStimati.length > 0 && (
             <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded p-2">
-              Dati non rilevati, assunti per stima da superficie, altezza, pareti esposte e destinazione d'uso:{" "}
+              Assunto per convenzione di progetto, non rilevato:{" "}
               <span className="font-semibold">
                 {campiStimati.map((c) => (ETICHETTE_CAMPI[c] || c).toLowerCase()).join(", ")}
               </span>
-              . Vanno confermati con un rilievo prima dell'ordine dei materiali.
+              . Se conosci il dato reale, inseriscilo nel form dell'ambiente.
+            </div>
+          )}
+
+          {parametriInseriti.length > 0 && (
+            <div className="bg-brand-50 border border-brand-200 text-brand-900 text-xs rounded p-2">
+              Coefficienti inseriti dal tecnico al posto del valore normativo:{" "}
+              <span className="font-semibold">
+                {parametriInseriti.map((p) => `${p.etichetta.toLowerCase()} = ${ambiente.parametri[p.chiave]} ${p.unita}`).join("; ")}
+              </span>
+              .
             </div>
           )}
 
           <div>
             <h4 className="font-semibold text-slate-700 mb-1">Dati climatici di progetto</h4>
-            <Riga label="Temperatura interna di progetto (invernale)" value={`${TEMP_INTERNA_PROGETTO} °C`} nota="DPR 412/93, uso residenziale" />
+            <Riga label="Temperatura interna di progetto (invernale)" value={`${risultato.tempInterna} °C`} nota="DPR 412/93, uso residenziale" />
             <Riga label="Temperatura esterna di progetto invernale" value={`${teInv} °C`} nota={comune.fonteInv === "UNI5364" ? "UNI 5364" : comune.fonteInv === "manuale" ? "inserimento manuale, corretta per altitudine (UNI 10349)" : "derivata per analogia (UNI 10349)"} />
-            <Riga label="ΔT invernale" value={`${(TEMP_INTERNA_PROGETTO - teInv).toFixed(1)} K`} />
-            <Riga label="Temperatura interna di progetto (estiva)" value={`${TEMP_INTERNA_ESTIVA} °C`} />
+            <Riga label="ΔT invernale" value={`${(risultato.tempInterna - teInv).toFixed(1)} K`} />
+            <Riga label="Temperatura interna di progetto (estiva)" value={`${risultato.tempInternaEstiva} °C`} />
             <Riga label="Temperatura a bulbo secco estiva di progetto" value={`${tbse} °C`} nota={comune.fonteEst === "UNI10339" ? "UNI 10339" : "derivata/manuale"} />
-            <Riga label="ΔT estivo" value={`${(tbse - TEMP_INTERNA_ESTIVA).toFixed(1)} K`} />
+            <Riga label="ΔT estivo" value={`${(tbse - risultato.tempInternaEstiva).toFixed(1)} K`} />
           </div>
 
           <div>
@@ -158,14 +171,14 @@ export default function DettaglioCalcolo({ risultato, comune, defaultOpen = fals
             <Riga
               label="Rinnovo aria — quota sensibile"
               value={`${scomposizioneEstiva.ventilazioneSensibileKw.toFixed(3)} kW`}
-              nota={`0,34 Wh/m³K × ${portataRinnovoMch.toFixed(1)} m³/h × ${(tbse - TEMP_INTERNA_ESTIVA).toFixed(1)} K`}
+              nota={`0,34 Wh/m³K × ${portataRinnovoMch.toFixed(1)} m³/h × ${(tbse - risultato.tempInternaEstiva).toFixed(1)} K`}
             />
             <Riga
               label="Rinnovo aria — quota latente (deumidificazione)"
               value={`${scomposizioneEstiva.ventilazioneLatenteKw.toFixed(3)} kW`}
               nota={`0,83 × ${portataRinnovoMch.toFixed(1)} m³/h × ${scomposizioneEstiva.deltaUmiditaGKg.toFixed(1)} g/kg (x esterna ${UMIDITA_SPECIFICA_ESTERNA_G_KG} — interna ${UMIDITA_SPECIFICA_INTERNA_G_KG} g/kg)`}
             />
-            <Riga label="Margine di sicurezza" value="+10%" />
+            <Riga label="Margine di sicurezza" value={`+${(scomposizioneEstiva.margineSicurezza * 100).toFixed(0)}%`} />
             <Riga label="Totale carico estivo (sensibile + latente)" value={<strong>{risultato.estivoKw.toFixed(3)} kW</strong>} />
             <p className="text-[11px] text-slate-400 mt-1">
               Carico calcolato alla temperatura di picco di progetto, senza correzione per l'escursione termica

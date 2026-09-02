@@ -19,24 +19,9 @@
  * in interfaccia; i raffinamenti sopra restano invece parte del calcolo
  * standard dell'applicazione, non del calcolo "non standard".
  */
-import {
-  TRASMITTANZE_PER_EPOCA,
-  FATTORE_ESPOSIZIONE,
-  MAGGIORAZIONE_ULTIMO_PIANO,
-  MAGGIORAZIONE_PIANO_INTERMEDIO,
-  MAGGIORAZIONE_PIANO_TERRA,
-  TEMP_INTERNA_PROGETTO,
-  TEMP_INTERNA_ESTIVA,
-  APPORTO_SOLARE,
-  RICAMBI_ARIA_PER_TIPO_LOCALE,
-  MAGGIORAZIONE_PONTI_TERMICI_PER_EPOCA,
-  FATTORE_B_LOCALE_NON_RISCALDATO,
-  INCREMENTO_SOLE_ARIA_PER_ESPOSIZIONE,
-  COEFF_CALORE_LATENTE_W_PER_MCH_G,
-  DELTA_UMIDITA_SPECIFICA_G_KG,
-  kwToBtu,
-  scegliTagliaCommerciale,
-} from "../data/calculations.js";
+import { TRASMITTANZE_PER_EPOCA, COEFF_CALORE_LATENTE_W_PER_MCH_G, kwToBtu, scegliTagliaCommerciale } from "../data/calculations.js";
+import { parametro, parametriSovrascritti, CAPACITA_TERMICA_ARIA } from "./parametriCalcolo.js";
+import { normalizzaGeometria } from "./stime.js";
 
 /** Trasmittanze effettivamente in uso per l'ambiente: override manuale se presente, altrimenti valore da epoca costruttiva. */
 export function getTrasmittanzeEffettive(ambiente) {
@@ -51,11 +36,6 @@ function getClimaEffettivo(ambiente, comune) {
   };
 }
 
-/** Ricambi d'aria orari effettivi: per tipo di locale se dichiarato, altrimenti "altro" (0,5 vol/h, compatibile con ambienti creati prima di questo campo). */
-function getRicambiAriaEffettivi(ambiente) {
-  return RICAMBI_ARIA_PER_TIPO_LOCALE[ambiente.tipoLocale] ?? RICAMBI_ARIA_PER_TIPO_LOCALE.altro;
-}
-
 /** Frazione (0-1) della superficie di muro esterno che affaccia in realtà su un ambiente NON riscaldato anziché sull'esterno. */
 function getFrazioneNonRiscaldata(ambiente) {
   if (!ambiente.pareteVersoNonRiscaldato) return 0;
@@ -63,7 +43,12 @@ function getFrazioneNonRiscaldata(ambiente) {
 }
 
 export function isAmbienteNonStandard(ambiente) {
-  return Boolean(ambiente.trasmittanzeOverride || ambiente.teInvOverride != null || ambiente.tbseOverride != null);
+  return Boolean(
+    ambiente.trasmittanzeOverride ||
+      ambiente.teInvOverride != null ||
+      ambiente.tbseOverride != null ||
+      parametriSovrascritti(ambiente).length > 0
+  );
 }
 
 /**
@@ -71,55 +56,70 @@ export function isAmbienteNonStandard(ambiente) {
  * e con i raffinamenti UNI EN 12831 (ponti termici, fattore b, ricambi
  * per tipo locale, sole-aria estivo) sempre applicati.
  */
-export function calcolaAmbienteConOverride(ambiente, comune) {
+export function calcolaAmbienteConOverride(ambienteGrezzo, comune) {
+  // Geometria sempre normalizzata: lunghezza e larghezza esplicite,
+  // superficie derivata, configurazione delle pareti in forma corrente.
+  const ambiente = normalizzaGeometria(ambienteGrezzo);
+
   const U = getTrasmittanzeEffettive(ambiente);
   const { teInv, tbse } = getClimaEffettivo(ambiente, comune);
   const nonStandard = isAmbienteNonStandard(ambiente);
   const frazioneNonRiscaldata = getFrazioneNonRiscaldata(ambiente);
-  const ricambiAriaOra = getRicambiAriaEffettivi(ambiente);
-  const maggiorazionePontiTermici = MAGGIORAZIONE_PONTI_TERMICI_PER_EPOCA[ambiente.epocaCostruttiva] ?? 0;
+
+  // Ogni coefficiente passa dal registro dei parametri: se l'utente ne ha
+  // inserito uno proprio è quello a entrare nel calcolo, altrimenti il
+  // default normativo. Nessun numero è cablato qui dentro.
+  const tempInterna = parametro(ambiente, "tempInternaInvernale");
+  const tempInternaEstiva = parametro(ambiente, "tempInternaEstiva");
+  const ricambiAriaOra = parametro(ambiente, "ricambiAriaOra");
+  const deltaUmiditaGKg = parametro(ambiente, "deltaUmiditaSpecifica");
+  const maggiorazionePontiTermici = parametro(ambiente, "maggiorazionePontiTermici");
+  const fattoreB = parametro(ambiente, "fattoreBLocaleNonRiscaldato");
+  const coeffPavimento = parametro(ambiente, "coeffPavimentoControterra");
+  const fattoreEsp = parametro(ambiente, "fattoreEsposizione");
+  const fattorePiano = parametro(ambiente, "fattorePiano");
+  const apportoSolareWm2 = parametro(ambiente, "apportoSolareWm2");
+  const fattoreSchermatura = parametro(ambiente, "fattoreSchermaturaSolare");
+  const incrementoSoleAria = parametro(ambiente, "incrementoSoleAria");
+  const apportoPersonaW = parametro(ambiente, "apportoPersonaW");
+  const apportoApparecchiWm2 = parametro(ambiente, "apportoApparecchiWm2");
+  const margineSicurezza = parametro(ambiente, "margineSicurezzaEstivo");
+
   const superficieMuroNetta = Math.max(0, ambiente.superficieMuriEsterni - ambiente.superficieFinestre);
 
   // --- Invernale (UNI EN 12831) ---
-  const deltaTInv = TEMP_INTERNA_PROGETTO - teInv;
+  const deltaTInv = tempInterna - teInv;
   // Fattore b: la quota di muro verso locale non riscaldato "vede" un ΔT ridotto rispetto all'esterno.
-  const deltaTInvMuroEffettivo = deltaTInv * (1 - frazioneNonRiscaldata * (1 - FATTORE_B_LOCALE_NON_RISCALDATO));
+  const deltaTInvMuroEffettivo = deltaTInv * (1 - frazioneNonRiscaldata * (1 - fattoreB));
   const Q_muri = U.muro * superficieMuroNetta * deltaTInvMuroEffettivo;
   const Q_vetri = U.vetro * ambiente.superficieFinestre * deltaTInv;
   const Q_tetto = ambiente.ultimoPiano ? U.tetto * ambiente.superficiePavimento * deltaTInv : 0;
-  const Q_pavimento = ambiente.pianoTerra ? U.pavimento * ambiente.superficiePavimento * deltaTInv * 0.7 : 0;
-  const fattoreEsp = FATTORE_ESPOSIZIONE[ambiente.esposizionePrevalente];
-  const fattorePiano = ambiente.ultimoPiano
-    ? MAGGIORAZIONE_ULTIMO_PIANO
-    : ambiente.pianoTerra
-    ? MAGGIORAZIONE_PIANO_TERRA
-    : MAGGIORAZIONE_PIANO_INTERMEDIO;
+  const Q_pavimento = ambiente.pianoTerra ? U.pavimento * ambiente.superficiePavimento * deltaTInv * coeffPavimento : 0;
   const trasmissioneBaseW = (Q_muri + Q_vetri + Q_tetto + Q_pavimento) * fattoreEsp * fattorePiano;
   // Maggiorazione per ponti termici lineari, applicata sul totale della dispersione per trasmissione.
   const trasmissioneW = trasmissioneBaseW * (1 + maggiorazionePontiTermici);
 
   const volumeAmbiente = ambiente.superficiePavimento * ambiente.altezza;
-  const ventilazioneW = 0.34 * ricambiAriaOra * volumeAmbiente * deltaTInv;
+  const ventilazioneW = CAPACITA_TERMICA_ARIA * ricambiAriaOra * volumeAmbiente * deltaTInv;
   const invernaleKw = (trasmissioneW + ventilazioneW) / 1000;
 
   // --- Estivo (metodo Carrier) ---
-  const deltaTEst = tbse - TEMP_INTERNA_ESTIVA;
-  const incrementoSoleAria = INCREMENTO_SOLE_ARIA_PER_ESPOSIZIONE[ambiente.esposizionePrevalente] ?? 0;
+  const deltaTEst = tbse - tempInternaEstiva;
   // Temperatura sole-aria sulla quota di muro realmente esposta all'irraggiamento (esclusa la quota verso locale non riscaldato); fattore b sulla quota interna.
   const deltaTEstMuroEffettivo =
-    (1 - frazioneNonRiscaldata) * (deltaTEst + incrementoSoleAria) + frazioneNonRiscaldata * (deltaTEst * FATTORE_B_LOCALE_NON_RISCALDATO);
+    (1 - frazioneNonRiscaldata) * (deltaTEst + incrementoSoleAria) + frazioneNonRiscaldata * (deltaTEst * fattoreB);
   const Q_trasmEst = U.muro * superficieMuroNetta * deltaTEstMuroEffettivo + U.vetro * ambiente.superficieFinestre * deltaTEst;
-  const Q_solare = ambiente.superficieFinestre * APPORTO_SOLARE[ambiente.esposizionePrevalente] * 0.5;
-  const Q_persone = ambiente.numeroOccupanti * 130;
-  const Q_apparecchi = ambiente.superficiePavimento * 8;
+  const Q_solare = ambiente.superficieFinestre * apportoSolareWm2 * fattoreSchermatura;
+  const Q_persone = ambiente.numeroOccupanti * apportoPersonaW;
+  const Q_apparecchi = ambiente.superficiePavimento * apportoApparecchiWm2;
   const portataRinnovoMch = ricambiAriaOra * volumeAmbiente; // [m³/h]
-  const Q_ventEstSensibile = 0.34 * portataRinnovoMch * deltaTEst;
+  const Q_ventEstSensibile = CAPACITA_TERMICA_ARIA * portataRinnovoMch * deltaTEst;
   // Quota latente: deumidificazione dell'aria di rinnovo. Omessa nel
   // calcolo sensibile puro, ma parte del carico totale a cui è dichiarata
   // la potenza frigorifera delle macchine.
-  const Q_ventEstLatente = COEFF_CALORE_LATENTE_W_PER_MCH_G * portataRinnovoMch * DELTA_UMIDITA_SPECIFICA_G_KG;
+  const Q_ventEstLatente = COEFF_CALORE_LATENTE_W_PER_MCH_G * portataRinnovoMch * deltaUmiditaGKg;
   const Q_ventEst = Q_ventEstSensibile + Q_ventEstLatente;
-  const estivoKw = ((Q_trasmEst + Q_solare + Q_persone + Q_apparecchi + Q_ventEst) * 1.1) / 1000;
+  const estivoKw = ((Q_trasmEst + Q_solare + Q_persone + Q_apparecchi + Q_ventEst) * (1 + margineSicurezza)) / 1000;
 
   const fabbisognoDimensionamento = Math.max(invernaleKw, estivoKw);
   const totaleW = trasmissioneW + ventilazioneW || 1;
@@ -132,9 +132,12 @@ export function calcolaAmbienteConOverride(ambiente, comune) {
   return {
     ambiente,
     nonStandard,
+    parametriSovrascritti: parametriSovrascritti(ambiente),
     U,
     teInv,
     tbse,
+    tempInterna,
+    tempInternaEstiva,
     ricambiAriaOra,
     maggiorazionePontiTermici,
     frazioneNonRiscaldata,
@@ -147,7 +150,8 @@ export function calcolaAmbienteConOverride(ambiente, comune) {
       apparecchiKw: Q_apparecchi / 1000,
       ventilazioneSensibileKw: Q_ventEstSensibile / 1000,
       ventilazioneLatenteKw: Q_ventEstLatente / 1000,
-      deltaUmiditaGKg: DELTA_UMIDITA_SPECIFICA_G_KG,
+      deltaUmiditaGKg,
+      margineSicurezza,
     },
     invernaleKw,
     estivoKw,

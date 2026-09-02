@@ -3,6 +3,7 @@ import AmbienteForm from "./AmbienteForm.jsx";
 import { nuovoAmbiente } from "../utils/modelli.js";
 import { ambienteValido } from "../utils/validazione.js";
 import { ETICHETTE_TIPO_LOCALE } from "../data/calculations.js";
+import { OPZIONI_PARETI_ESTERNE } from "../utils/stime.js";
 
 const ETICHETTE_PIANO = {
   terra: "piano terra",
@@ -13,12 +14,12 @@ const ETICHETTE_PIANO = {
 /** Riga di riepilogo di un ambiente chiuso: i dati che lo rendono riconoscibile a colpo d'occhio. */
 function riassunto(ambiente) {
   const piano = ambiente.ultimoPiano ? "ultimo" : ambiente.pianoTerra ? "terra" : "intermedio";
-  const pareti = ambiente.paretiEsterne ?? 1;
+  const pareti = OPZIONI_PARETI_ESTERNE.find((o) => o.value === ambiente.paretiEsterne);
   return [
-    `${ambiente.superficiePavimento} m²`,
+    `${ambiente.lunghezzaM} × ${ambiente.larghezzaM} m (${ambiente.superficiePavimento} m²)`,
     ETICHETTE_TIPO_LOCALE[ambiente.tipoLocale] || ETICHETTE_TIPO_LOCALE.altro,
     ETICHETTE_PIANO[piano],
-    `${pareti} ${pareti === 1 ? "parete esterna" : "pareti esterne"}`,
+    pareti ? pareti.label.toLowerCase() : "pareti esterne da definire",
   ].join(" · ");
 }
 
