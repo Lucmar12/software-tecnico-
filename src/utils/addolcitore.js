@@ -17,6 +17,7 @@
  * con dosaggio medio di NaCl) — il costruttore dell'addolcitore selezionato
  * dichiara il proprio valore specifico, da usare in fase esecutiva.
  */
+import { calcolaPortataPunta, NUMERO_BAGNI_DEFAULT } from "./pompeIdrauliche.js";
 
 /** Capacità di scambio ciclica specifica della resina [°fH · litri di acqua trattata per litro di resina], dosaggio sale standard. */
 export const CAPACITA_CICLICA_RESINA_GF_L = 4500;
@@ -36,8 +37,17 @@ export const DUREZZA_INGRESSO_DEFAULT_GF = 25;
 /** Consumo idrico domestico medio pro capite di default [litri/persona/giorno] — consumo totale (non solo ACS). */
 export const CONSUMO_LITRI_PERSONA_GIORNO_DEFAULT = 150;
 
-/** Portata di punta istantanea di default per un'utenza residenziale [m³/h]. */
-export const PORTATA_PUNTA_DEFAULT_MC = 1.5;
+/**
+ * Portata di punta istantanea dell'utenza [m³/h]: è il dato che la
+ * valvola dell'addolcitore deve poter smaltire senza strozzare la rete.
+ *
+ * Non è più un numero fisso: si ricava dagli apparecchi sanitari
+ * installati con lo stesso metodo UNI 9182 usato per l'autoclave (vedi
+ * utils/pompeIdrauliche.js). Prima questo modulo assumeva 1,5 m³/h
+ * mentre l'autoclave ne calcolava un altro: due moduli, stessa casa, due
+ * portate diverse. La portata dell'impianto è una sola.
+ */
+export const NUMERO_BAGNI_DEFAULT_TRATTAMENTO = NUMERO_BAGNI_DEFAULT;
 
 /** Autonomia target tra due rigenerazioni successive, di default [giorni]. */
 export const AUTONOMIA_GIORNI_DEFAULT = 3;
@@ -53,9 +63,12 @@ export function calcolaAddolcitore({
   durezzaResiduaGf = DUREZZA_RESIDUA_DEFAULT_GF,
   numeroPersone,
   consumoLitriPersonaGiorno = CONSUMO_LITRI_PERSONA_GIORNO_DEFAULT,
-  portataPuntaMc = PORTATA_PUNTA_DEFAULT_MC,
+  numeroBagni = NUMERO_BAGNI_DEFAULT,
+  haLavatrice = true,
   autonomiaGiorniTarget = AUTONOMIA_GIORNI_DEFAULT,
 }) {
+  const punta = calcolaPortataPunta({ numeroBagni, haLavatrice });
+  const portataPuntaMc = punta.portataPuntaMc;
   const consumoGiornalieroLitri = numeroPersone * consumoLitriPersonaGiorno;
   const durezzaDaAbbattereGf = Math.max(0, durezzaIngressoGf - durezzaResiduaGf);
 
@@ -77,6 +90,10 @@ export function calcolaAddolcitore({
     taglioNonDisponibile,
     messaggio: taglioNonDisponibile ? "Necessario addolcitore >30 L di resina o configurazione doppia" : null,
     portataPuntaMc,
+    portataPuntaLmin: punta.portataPuntaLmin,
+    numeroApparecchi: punta.numeroApparecchi,
+    numeroBagni,
+    haLavatrice,
     autonomiaGiorniTarget,
     numeroRigenerazioniAnno,
     consumoSaleKgAnno,

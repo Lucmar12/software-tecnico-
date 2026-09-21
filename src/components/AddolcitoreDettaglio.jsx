@@ -45,7 +45,11 @@ export default function AddolcitoreDettaglio({ trattamentoAcque }) {
             <Riga label="Durezza in ingresso" value={`${trattamentoAcque.durezzaIngressoGf} °fH`} />
             <Riga label="Durezza residua obiettivo" value={`${trattamentoAcque.durezzaResiduaGf} °fH`} />
             <Riga label="Capacità di scambio ciclica specifica applicata" value={`${CAPACITA_CICLICA_RESINA_GF_L.toLocaleString("it-IT")} °fH·l/l resina`} />
-            <Riga label="Portata di punta di riferimento" value={`${risultato.portataPuntaMc.toFixed(1)} m³/h`} />
+            <Riga
+              label="Portata di punta di riferimento"
+              value={`${risultato.portataPuntaMc.toFixed(2)} m³/h`}
+              nota={`${risultato.numeroApparecchi} apparecchi (${risultato.numeroBagni} ${risultato.numeroBagni === 1 ? "bagno" : "bagni"}, cucina${risultato.haLavatrice ? ", lavatrice" : ""}), contemporaneità UNI 9182 — ${risultato.portataPuntaLmin.toFixed(0)} l/min`}
+            />
             <Riga label="Rigenerazioni stimate" value={`${Math.round(risultato.numeroRigenerazioniAnno)}/anno`} />
             <Riga
               label="Consumo di sale stimato"

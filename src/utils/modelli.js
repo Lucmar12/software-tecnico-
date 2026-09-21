@@ -108,6 +108,10 @@ import { PRESSIONE_RESIDUA_MINIMA_BAR_DEFAULT, PERDITE_CARICO_PCT_DEFAULT, NUMER
 export function nuovoTrattamentoAcque(overrides = {}) {
   return {
     numeroPersone: 3,
+    // La portata di punta si ricava dagli apparecchi, con lo stesso metodo
+    // UNI 9182 dell'autoclave: l'impianto idrico della casa è uno solo.
+    numeroBagni: NUMERO_BAGNI_DEFAULT,
+    haLavatrice: true,
     durezzaIngressoGf: DUREZZA_INGRESSO_DEFAULT_GF,
     durezzaResiduaGf: DUREZZA_RESIDUA_DEFAULT_GF,
     consumoLitriPersonaGiorno: CONSUMO_LITRI_PERSONA_GIORNO_DEFAULT,

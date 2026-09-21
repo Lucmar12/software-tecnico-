@@ -367,6 +367,16 @@ function ambienteRiferimento(extra = {}) {
   uguale("taglia commerciale resina [l]", a.tagliaResinaLitri, 8);
   // rigenerazioni = 365 / 3 = 121,7 all'anno ; sale = 8 l × 0,15 kg/l × 121,7
   uguale("rigenerazioni all'anno", a.numeroRigenerazioniAnno, 365 / 3, 1e-6);
+
+  // La portata che la valvola deve smaltire è quella della casa, ricavata
+  // dagli apparecchi con lo stesso metodo UNI 9182 dell'autoclave: due
+  // moduli, stessa abitazione, un solo valore.
+  const autoclaveStessaCasa = calcolaAutoclave({ numeroPersone: 3, numeroPiani: 2, numeroBagni: 2, haLavatrice: true });
+  uguale("addolcitore e autoclave concordano sulla portata di punta", a.portataPuntaMc, autoclaveStessaCasa.portataPuntaMc, 1e-9);
+  uguale("portata di punta dell'addolcitore [m³/h]", a.portataPuntaMc, 1.48, 0.005);
+  // Un bagno in più alza la portata richiesta alla valvola.
+  const conTreBagni = calcolaAddolcitore({ numeroPersone: 3, numeroBagni: 3 });
+  vero("più bagni, più portata da smaltire", conTreBagni.portataPuntaMc > a.portataPuntaMc);
   uguale("consumo di sale [kg/anno]", a.consumoSaleKgAnno, 8 * 0.15 * (365 / 3), 0.01);
 }
 
