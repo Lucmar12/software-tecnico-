@@ -25,6 +25,7 @@ import { calcolaPotenzaPompaCaloreAcs } from "../src/utils/pompaDiCaloreAcs.js";
 import { calcolaFattoreDeratingBassaTemperatura } from "../src/utils/deratingPompaDiCalore.js";
 import { calcolaBollitore, kwToBtu, btuToKw, TRASMITTANZE_PER_EPOCA, MAGGIORAZIONE_PONTI_TERMICI_PER_EPOCA, RICAMBI_ARIA_PER_TIPO_LOCALE, ZONE_CLIMATICHE, TAGLIE_COMMERCIALI_BTU, TAGLIE_BOLLITORE_STANDARD, EFFICIENZA_PER_CLASSE, FATTORE_ESPOSIZIONE } from "../src/data/calculations.js";
 import { PARAMETRI_CALCOLO, parametro, parametroDefault } from "../src/utils/parametriCalcolo.js";
+import { stimaConsumoAnnuoClimatizzazione } from "../src/utils/fotovoltaico.js";
 import { calcolaSuperficieMuriEsterni, sviluppoParetiEsterne, areaFinestra, normalizzaGeometria } from "../src/utils/stime.js";
 import { ORE_DI_CALCOLO, quotaIrraggiamento, temperaturaEsternaOraria, ESCURSIONE_DEFAULT_K } from "../src/utils/profiliOrari.js";
 
@@ -370,6 +371,35 @@ function ambienteRiferimento(extra = {}) {
 }
 
 // ---------------------------------------------------------------------
+// CONSUMO ANNUO — metodo dei gradi giorno
+// ---------------------------------------------------------------------
+{
+  // Il carico di progetto si verifica solo al giorno più freddo: il
+  // fabbisogno annuo si ricava dai gradi giorno, non dalle ore di
+  // esercizio dell'impianto.
+  //   ore equivalenti = GG × 24 / ΔT_progetto × quota coperta
+  //   zona D: 1750 × 24 / 22 × 0,75 = 1.431,8 h
+  //   riscaldamento = 6 kW × 1.431,8 / 4,0 (SCOP A++) = 2.147,7 kWh
+  //   raffrescamento = 5 kW × 400 h / 6,1 (SEER A++) = 327,9 kWh
+  const c = stimaConsumoAnnuoClimatizzazione({ totaleInvernaleKw: 6, totaleEstivoKw: 5, comune: COMUNE });
+  uguale("ore equivalenti di riscaldamento", c.oreEquivalentiRiscaldamento, ((1750 * 24) / 22) * 0.75, 0.01);
+  uguale("consumo di riscaldamento [kWh/anno]", c.consumoRiscaldamentoKwh, 2147.72, 0.5);
+  uguale("consumo di raffrescamento [kWh/anno]", c.consumoRaffrescamentoKwh, (5 * 400) / 6.1, 0.5);
+  uguale("consumo annuo complessivo [kWh]", c.consumoAnnuoKwh, c.consumoRiscaldamentoKwh + c.consumoRaffrescamentoKwh, 1e-9);
+
+  // Lo stesso edificio consuma meno dove il clima è più mite: il metodo
+  // reagisce sia alla zona sia alla temperatura di progetto del comune.
+  const montagna = stimaConsumoAnnuoClimatizzazione({ totaleInvernaleKw: 6, totaleEstivoKw: 5, comune: { zona: "F", teInv: -8 } });
+  const mare = stimaConsumoAnnuoClimatizzazione({ totaleInvernaleKw: 6, totaleEstivoKw: 5, comune: { zona: "B", teInv: 5 } });
+  vero("in zona F si consuma più che in zona D", montagna.consumoRiscaldamentoKwh > c.consumoRiscaldamentoKwh);
+  vero("in zona B si consuma meno che in zona D", mare.consumoRiscaldamentoKwh < c.consumoRiscaldamentoKwh);
+  // A parità di zona, un comune più freddo ha ΔT maggiore e quindi meno
+  // ore equivalenti, ma parte da un carico di progetto più alto.
+  const stessaZonaPiuMite = stimaConsumoAnnuoClimatizzazione({ totaleInvernaleKw: 6, totaleEstivoKw: 5, comune: { zona: "D", teInv: 2 } });
+  vero("dentro la stessa zona conta anche la temperatura di progetto", stessaZonaPiuMite.oreEquivalentiRiscaldamento !== c.oreEquivalentiRiscaldamento);
+}
+
+// ---------------------------------------------------------------------
 // CONVERSIONI DI UNITÀ
 // ---------------------------------------------------------------------
 {
@@ -465,6 +495,19 @@ function ambienteRiferimento(extra = {}) {
     if (!(ZONE_CLIMATICHE[zone[i]].oreRiscaldamento > ZONE_CLIMATICHE[zone[i - 1]].oreRiscaldamento)) zoneMonotone = false;
   }
   vero("ore di riscaldamento crescenti da zona A a zona F", zoneMonotone);
+
+  // I gradi giorno definiscono le zone stesse: devono crescere con esse e
+  // cadere dentro l'intervallo dichiarato dal DPR 412/93.
+  let ggMonotoni = true;
+  for (let i = 1; i < zone.length; i++) {
+    if (!(ZONE_CLIMATICHE[zone[i]].gradiGiorno > ZONE_CLIMATICHE[zone[i - 1]].gradiGiorno)) ggMonotoni = false;
+  }
+  vero("gradi giorno crescenti da zona A a zona F", ggMonotoni);
+  const limiti = { A: [0, 600], B: [601, 900], C: [901, 1400], D: [1401, 2100], E: [2101, 3000], F: [3001, 5000] };
+  for (const z of zone) {
+    const [min, max] = limiti[z];
+    vero(`gradi giorno della zona ${z} dentro l'intervallo normativo`, ZONE_CLIMATICHE[z].gradiGiorno >= min && ZONE_CLIMATICHE[z].gradiGiorno <= max, String(ZONE_CLIMATICHE[z].gradiGiorno));
+  }
 
   // D'inverno il nord disperde più del sud: il fattore correttivo lo riflette.
   vero("fattore esposizione: nord più sfavorevole del sud", FATTORE_ESPOSIZIONE.nord > FATTORE_ESPOSIZIONE.sud);

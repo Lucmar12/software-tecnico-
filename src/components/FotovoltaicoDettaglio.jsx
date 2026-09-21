@@ -31,7 +31,11 @@ export default function FotovoltaicoDettaglio({ edificio, comune, fotovoltaico }
         producibilità puntuale (orientamento, inclinazione, ombreggiamenti reali).
       </p>
       <div className="grid sm:grid-cols-4 gap-3 text-sm">
-        <Riquadro label="Consumo annuo stimato" value={`${Math.round(consumo.consumoAnnuoKwh).toLocaleString("it-IT")} kWh`} />
+        <Riquadro
+          label="Consumo annuo stimato"
+          value={`${Math.round(consumo.consumoAnnuoKwh).toLocaleString("it-IT")} kWh`}
+          nota={`${Math.round(consumo.oreEquivalentiRiscaldamento)} h equivalenti in riscaldamento (${consumo.gradiGiorno} GG × 24 / ΔT ${consumo.deltaTProgetto} K, al netto degli apporti gratuiti) + ${consumo.oreEquivalentiRaffrescamento} h in raffrescamento`}
+        />
         <Riquadro label="Producibilità FV annua" value={`${Math.round(copertura.producibilitaAnnuaKwh).toLocaleString("it-IT")} kWh`} />
         <Riquadro label="Quota autoconsumo" value={`${(copertura.quotaAutoconsumo * 100).toFixed(0)}%`} />
         <Riquadro
@@ -63,11 +67,12 @@ export default function FotovoltaicoDettaglio({ edificio, comune, fotovoltaico }
   );
 }
 
-function Riquadro({ label, value, evidenziato }) {
+function Riquadro({ label, value, nota, evidenziato }) {
   return (
     <div className={`rounded-lg p-3 border ${evidenziato ? "bg-emerald-50 border-emerald-200" : "bg-slate-50 border-slate-200"}`}>
       <div className={`text-xs ${evidenziato ? "text-emerald-700" : "text-slate-500"}`}>{label}</div>
       <div className={`text-xl font-bold ${evidenziato ? "text-emerald-800" : "text-slate-800"}`}>{value}</div>
+      {nota && <div className="text-[10px] text-slate-400 leading-tight mt-0.5">{nota}</div>}
     </div>
   );
 }

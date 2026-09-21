@@ -125,7 +125,7 @@ export default function RelazioneCalcolo({ scenari, scenarioProgetto, comune, ac
                     "elettrico"
                   )
                 ).toLocaleString("it-IT")} kg/anno`}
-                sotto="Classe rappresentativa A++, mix elettrico medio IT"
+                sotto={`Classe A++, mix elettrico medio IT · consumo da ${ZONE_CLIMATICHE[comune.zona].gradiGiorno} gradi giorno`}
               />
             </div>
             {scenario.edificio.riduzionePerContemporaneitaPct > 0.5 && (

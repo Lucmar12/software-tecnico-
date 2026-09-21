@@ -13,10 +13,25 @@
  * ai fini Ecobonus/Conto Termico.
  */
 
-import { calcolaConsumoAnnuo, EFFICIENZA_PER_CLASSE, ZONE_CLIMATICHE } from "../data/calculations.js";
+import { calcolaConsumoAnnuo, EFFICIENZA_PER_CLASSE, ZONE_CLIMATICHE, TEMP_INTERNA_PROGETTO } from "../data/calculations.js";
 
-/** Ore equivalenti di funzionamento a pieno carico in raffrescamento, valore convenzionale indicativo (non normato). */
-const ORE_RAFFRESCAMENTO_ANNO = 400;
+/**
+ * Ore equivalenti di funzionamento a pieno carico in raffrescamento, per
+ * zona climatica. Il raffrescamento non ha un equivalente dei gradi
+ * giorno nel DPR 412/93: questi sono valori di pratica corrente, più alti
+ * dove l'estate è lunga (zone A e B) e bassi in montagna (E, F).
+ * Convenzionali e non certificati.
+ */
+const ORE_RAFFRESCAMENTO_PER_ZONA = { A: 600, B: 550, C: 450, D: 400, E: 300, F: 200 };
+
+/**
+ * Quota del fabbisogno di riscaldamento effettivamente coperta
+ * dall'impianto: apporti interni (persone, elettrodomestici) e solari
+ * gratuiti ne coprono una parte, che il metodo dei gradi giorno non
+ * scorpora. Valore convenzionale di pratica corrente per il
+ * residenziale, non certificato.
+ */
+const QUOTA_COPERTA_DALL_IMPIANTO = 0.75;
 
 /**
  * Stima il consumo elettrico annuo complessivo dell'impianto di
@@ -27,14 +42,41 @@ const ORE_RAFFRESCAMENTO_ANNO = 400;
  */
 export function stimaConsumoAnnuoClimatizzazione({ totaleInvernaleKw, totaleEstivoKw, comune, classeRappresentativa = "A++" }) {
   const efficienza = EFFICIENZA_PER_CLASSE[classeRappresentativa];
-  const oreRiscaldamentoAnno = ZONE_CLIMATICHE[comune.zona].oreRiscaldamento * 120; // stima convenzionale, coerente col resto dell'app
-  const consumoRiscaldamentoKwh = calcolaConsumoAnnuo(totaleInvernaleKw, oreRiscaldamentoAnno, efficienza, "riscaldamento");
-  const consumoRaffrescamentoKwh = calcolaConsumoAnnuo(totaleEstivoKw, ORE_RAFFRESCAMENTO_ANNO, efficienza, "raffrescamento");
+  const zona = ZONE_CLIMATICHE[comune.zona];
+
+  /*
+   * ORE EQUIVALENTI A PIENO CARICO, metodo dei gradi giorno.
+   *
+   * Il carico di progetto si verifica solo al giorno più freddo: usarlo
+   * per tutte le ore di esercizio sovrastimerebbe il consumo. Il
+   * fabbisogno annuo si ricava invece dal coefficiente di dispersione
+   * dell'edificio H = P_progetto / ΔT_progetto moltiplicato per i gradi
+   * giorno:
+   *
+   *   Q = H × GG × 24  →  ore equivalenti = GG × 24 / ΔT_progetto
+   *
+   * Così il consumo dipende davvero dal clima del comune scelto — dai
+   * suoi gradi giorno e dalla sua temperatura di progetto — e non da un
+   * numero fisso per zona.
+   */
+  const deltaTProgetto = Math.max(1, TEMP_INTERNA_PROGETTO - comune.teInv);
+  const gradiGiorno = zona.gradiGiorno;
+  const oreEquivalentiRiscaldamento = ((gradiGiorno * 24) / deltaTProgetto) * QUOTA_COPERTA_DALL_IMPIANTO;
+  const oreEquivalentiRaffrescamento = ORE_RAFFRESCAMENTO_PER_ZONA[comune.zona] ?? 400;
+
+  const consumoRiscaldamentoKwh = calcolaConsumoAnnuo(totaleInvernaleKw, oreEquivalentiRiscaldamento, efficienza, "riscaldamento");
+  const consumoRaffrescamentoKwh = calcolaConsumoAnnuo(totaleEstivoKw, oreEquivalentiRaffrescamento, efficienza, "raffrescamento");
+
   return {
     consumoRiscaldamentoKwh,
     consumoRaffrescamentoKwh,
     consumoAnnuoKwh: consumoRiscaldamentoKwh + consumoRaffrescamentoKwh,
     classeRappresentativa,
+    gradiGiorno,
+    deltaTProgetto,
+    oreEquivalentiRiscaldamento,
+    oreEquivalentiRaffrescamento,
+    quotaCopertaDallImpianto: QUOTA_COPERTA_DALL_IMPIANTO,
   };
 }
 

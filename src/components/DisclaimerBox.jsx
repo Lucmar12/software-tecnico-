@@ -12,7 +12,18 @@ export default function DisclaimerBox() {
       umbre; per i comuni non elencati il valore è corretto per altitudine secondo il metodo UNI 10349. Per la
       progettazione esecutiva, il dimensionamento definitivo e l'accesso a detrazioni fiscali (Ecobonus, Conto
       Termico) è necessaria una relazione tecnica firmata da un termotecnico abilitato, con software certificato e
-      sopralluogo.
+      sopralluogo: <strong className="text-slate-600">questo documento non ha valore legale</strong> e non sostituisce
+      il progetto.
+      <span className="block mt-2">
+        <strong className="text-slate-600">Cosa è assunto per convenzione.</strong> Trasmittanze per epoca
+        costruttiva in assenza di diagnosi energetica; maggiorazione forfettaria per ponti termici invece del calcolo
+        puntuale dei giunti; affollamento convenzionale per destinazione d'uso; umidità specifica esterna media per
+        l'Italia centrale al posto del bulbo umido del comune; gradi giorno rappresentativi della zona climatica
+        anziché il valore tabellato del singolo comune; profili orari di irraggiamento e temperatura di forma
+        convenzionale, senza inerzia termica delle murature. Ogni coefficiente è esposto e modificabile
+        nell'interfaccia: inserendo i dati reali il calcolo smette di essere convenzionale nel punto corrispondente.
+        Prima dell'ordine dei materiali, confermare con un rilievo.
+      </span>
     </div>
   );
 }

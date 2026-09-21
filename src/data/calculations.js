@@ -36,14 +36,24 @@
 // COSTANTI DI RIFERIMENTO NORMATIVO
 // ---------------------------------------------------------------------
 
-/** Ore convenzionali di riscaldamento e periodo di esercizio per zona climatica (DPR 412/93). */
+/**
+ * Ore convenzionali di riscaldamento, periodo di esercizio e gradi giorno
+ * per zona climatica (DPR 412/93).
+ *
+ * Le zone climatiche SONO definite per intervalli di gradi giorno: A fino
+ * a 600, B 601-900, C 901-1400, D 1401-2100, E 2101-3000, F oltre 3000.
+ * `gradiGiorno` riporta il valore centrale di ciascun intervallo, usato
+ * per stimare il fabbisogno annuo quando il dato puntuale del comune non
+ * è disponibile: è un valore rappresentativo della zona, non il GG
+ * ufficiale del singolo comune, che il DPR 412/93 tabella uno per uno.
+ */
 export const ZONE_CLIMATICHE = {
-  A: { oreRiscaldamento: 6, periodo: "1 dic - 15 mar" },
-  B: { oreRiscaldamento: 8, periodo: "1 dic - 31 mar" },
-  C: { oreRiscaldamento: 10, periodo: "15 nov - 31 mar" },
-  D: { oreRiscaldamento: 12, periodo: "1 nov - 15 apr" },
-  E: { oreRiscaldamento: 14, periodo: "15 ott - 15 apr" },
-  F: { oreRiscaldamento: 24, periodo: "tutto l'anno" },
+  A: { oreRiscaldamento: 6, periodo: "1 dic - 15 mar", gradiGiorno: 500, intervalloGradiGiorno: "fino a 600" },
+  B: { oreRiscaldamento: 8, periodo: "1 dic - 31 mar", gradiGiorno: 750, intervalloGradiGiorno: "601-900" },
+  C: { oreRiscaldamento: 10, periodo: "15 nov - 31 mar", gradiGiorno: 1150, intervalloGradiGiorno: "901-1400" },
+  D: { oreRiscaldamento: 12, periodo: "1 nov - 15 apr", gradiGiorno: 1750, intervalloGradiGiorno: "1401-2100" },
+  E: { oreRiscaldamento: 14, periodo: "15 ott - 15 apr", gradiGiorno: 2550, intervalloGradiGiorno: "2101-3000" },
+  F: { oreRiscaldamento: 24, periodo: "tutto l'anno", gradiGiorno: 3200, intervalloGradiGiorno: "oltre 3000" },
 };
 
 /** Temperatura interna di progetto invernale, residenziale (DPR 412/93) [°C]. */
