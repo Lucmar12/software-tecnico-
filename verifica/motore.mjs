@@ -563,15 +563,18 @@ function ambienteRiferimento(extra = {}) {
   ugualeTesto("la top è la CA-PRO", alternative[2].prodotto.serie, "CA-PRO");
   vero("ordinate per prezzo crescente", alternative[0].prodotto.prezzoIndicativoMin < alternative[1].prodotto.prezzoIndicativoMin && alternative[1].prodotto.prezzoIndicativoMin < alternative[2].prodotto.prezzoIndicativoMin);
   vero("stessa taglia commerciale in tutte e tre", new Set(alternative.map((a) => a.prodotto.tagliaCommerciale)).size === 1);
-  // Classi come le stampa il listino: la base è A++ in raffrescamento, le
-  // altre due A+++. Il campo classeSeer è SEMPRE il raffrescamento: un
-  // giorno qualcuno sarà tentato di scambiarlo con lo SCOP, e da quel
-  // momento i preventivi dichiarerebbero la classe sbagliata.
-  ugualeTesto("la base è A++ in raffrescamento", alternative[0].prodotto.classeEnergetica, "A++");
-  ugualeTesto("l'intermedia è A+++ in raffrescamento", alternative[1].prodotto.classeEnergetica, "A+++");
-  ugualeTesto("la top è A+++ in raffrescamento", alternative[2].prodotto.classeEnergetica, "A+++");
-  vero("la base ha la classe di raffrescamento più bassa delle altre due", alternative[0].prodotto.classeEnergetica !== alternative[2].prodotto.classeEnergetica);
-  vero("a parità di classe, la top costa più dell'intermedia", alternative[2].prodotto.prezzoIndicativoMin > alternative[1].prodotto.prezzoIndicativoMin);
+  // `classeEnergetica` è SEMPRE il raffrescamento (SEER) e `classeScop`
+  // il riscaldamento: scambiarli significa dichiarare su un preventivo una
+  // classe che il prodotto non ha, ed è uno scambio facile da fare senza
+  // accorgersene. I tre livelli si leggono come freddo / caldo:
+  //   base        A++  / A++,A+
+  //   intermedia  A+++ / A++
+  //   top         A+++ / A+++
+  ugualeTesto("base: A++ in raffrescamento", alternative[0].prodotto.classeEnergetica, "A++");
+  ugualeTesto("intermedia: A+++ in raffrescamento, A++ in riscaldamento", `${alternative[1].prodotto.classeEnergetica} / ${alternative[1].prodotto.classeScop}`, "A+++ / A++");
+  ugualeTesto("top: A+++ in entrambe le stagioni", `${alternative[2].prodotto.classeEnergetica} / ${alternative[2].prodotto.classeScop}`, "A+++ / A+++");
+  vero("è il riscaldamento a separare intermedia e top", alternative[1].prodotto.classeEnergetica === alternative[2].prodotto.classeEnergetica && alternative[1].prodotto.classeScop !== alternative[2].prodotto.classeScop);
+  vero("la top costa più dell'intermedia", alternative[2].prodotto.prezzoIndicativoMin > alternative[1].prodotto.prezzoIndicativoMin);
   // Le famiglie senza livelli non hanno alternative di gamma: una linea sola.
   uguale("i canalizzabili non hanno livelli di gamma", trovaAlternativeDiGamma(5.0, "canalizzabile").alternative.length, 0);
 
