@@ -51,6 +51,7 @@ export default function DettaglioCalcolo({ risultato, comune, defaultOpen = fals
     incrementoSoleAria,
     portataRinnovoMch,
     scomposizioneEstiva,
+    profiloEstivo,
   } = risultato;
 
   // Muri e finestre sono calcolati da dati dichiarati dall'utente (lati
@@ -103,7 +104,11 @@ export default function DettaglioCalcolo({ risultato, comune, defaultOpen = fals
             <Riga label="ΔT invernale" value={`${(risultato.tempInterna - teInv).toFixed(1)} K`} />
             <Riga label="Temperatura interna di progetto (estiva)" value={`${risultato.tempInternaEstiva} °C`} />
             <Riga label="Temperatura a bulbo secco estiva di progetto" value={`${tbse} °C`} nota={comune.fonteEst === "UNI10339" ? "UNI 10339" : "derivata/manuale"} />
-            <Riga label="ΔT estivo" value={`${(tbse - risultato.tempInternaEstiva).toFixed(1)} K`} />
+            <Riga
+              label="ΔT estivo all'ora di punta"
+              value={`${(scomposizioneEstiva.temperaturaEsterna - risultato.tempInternaEstiva).toFixed(1)} K`}
+              nota={`alle ${scomposizioneEstiva.ora}:00 l'aria esterna è a ${scomposizioneEstiva.temperaturaEsterna.toFixed(1)} °C`}
+            />
           </div>
 
           <div>
@@ -162,16 +167,25 @@ export default function DettaglioCalcolo({ risultato, comune, defaultOpen = fals
             <h4 className="font-semibold text-slate-700 mb-1 mt-1">Carico termico estivo di progetto (metodo Carrier)</h4>
             <Riga
               label="Incremento sole-aria su superfici opache"
-              value={`+${incrementoSoleAria} K`}
-              nota={`esposizione ${ambiente.esposizionePrevalente}, irraggiamento su pareti`}
+              value={`+${scomposizioneEstiva.incrementoSoleAria.toFixed(1)} K`}
+              nota={`${incrementoSoleAria} K di picco × ${(scomposizioneEstiva.quotaIrraggiamento * 100).toFixed(0)}% di irraggiamento a quest'ora`}
             />
-            <Riga label="Apporto solare per esposizione" value={`${APPORTO_SOLARE[ambiente.esposizionePrevalente]} W/m² vetro`} />
+            <Riga
+              label="Ora di punta dell'ambiente"
+              value={`${scomposizioneEstiva.ora}:00`}
+              nota={`esposizione ${ambiente.esposizionePrevalente}: riceve allora il ${(scomposizioneEstiva.quotaIrraggiamento * 100).toFixed(0)}% del proprio irraggiamento massimo`}
+            />
+            <Riga
+              label="Apporto solare di picco per esposizione"
+              value={`${APPORTO_SOLARE[ambiente.esposizionePrevalente]} W/m² vetro`}
+              nota={`applicato al ${(scomposizioneEstiva.quotaIrraggiamento * 100).toFixed(0)}% all'ora di punta`}
+            />
             <Riga label="Apporto persone" value={`${scomposizioneEstiva.personeKw.toFixed(3)} kW`} nota={`${ambiente.numeroOccupanti} occupanti × 130 W/persona (sensibile + latente)`} />
             <Riga label="Apporto apparecchiature" value={`${scomposizioneEstiva.apparecchiKw.toFixed(3)} kW`} nota="8 W/m² convenzionali" />
             <Riga
               label="Rinnovo aria — quota sensibile"
               value={`${scomposizioneEstiva.ventilazioneSensibileKw.toFixed(3)} kW`}
-              nota={`0,34 Wh/m³K × ${portataRinnovoMch.toFixed(1)} m³/h × ${(tbse - risultato.tempInternaEstiva).toFixed(1)} K`}
+              nota={`0,34 Wh/m³K × ${portataRinnovoMch.toFixed(1)} m³/h × ${(scomposizioneEstiva.temperaturaEsterna - risultato.tempInternaEstiva).toFixed(1)} K`}
             />
             <Riga
               label="Rinnovo aria — quota latente (deumidificazione)"
@@ -181,9 +195,10 @@ export default function DettaglioCalcolo({ risultato, comune, defaultOpen = fals
             <Riga label="Margine di sicurezza" value={`+${(scomposizioneEstiva.margineSicurezza * 100).toFixed(0)}%`} />
             <Riga label="Totale carico estivo (sensibile + latente)" value={<strong>{risultato.estivoKw.toFixed(3)} kW</strong>} />
             <p className="text-[11px] text-slate-400 mt-1">
-              Carico calcolato alla temperatura di picco di progetto, senza correzione per l'escursione termica
-              giornaliera: assunzione a favore di sicurezza. L'umidità specifica esterna è un valore convenzionale
-              per l'Italia centrale, non il bulbo umido puntuale del comune.
+              Carico valutato alle {profiloEstivo.map((v) => `${v.ora}:00`).join(", ")} e assunto pari al massimo:
+              questo ambiente va in punta alle {scomposizioneEstiva.ora}:00. Il calcolo non considera l'inerzia
+              termica delle murature, che nella realtà ritarda e smussa il picco, e l'umidità specifica esterna è un
+              valore convenzionale per l'Italia centrale, non il bulbo umido puntuale del comune.
             </p>
           </div>
 

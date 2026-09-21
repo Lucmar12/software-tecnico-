@@ -37,7 +37,11 @@ export default function VRFDettaglio({ risultatiAmbienti, sistemaCentralizzato, 
       <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
         <Riga label="Unità interne collegate" value={d.numeroUnitaInterne} />
         <Riga label="Totale invernale edificio" value={formattaKw(d.totaleInvernaleKw)} />
-        <Riga label="Totale estivo edificio" value={formattaKw(d.totaleEstivoKw)} />
+        <Riga
+          label="Totale estivo edificio"
+          value={formattaKw(d.totaleEstivoKw)}
+          nota={d.oraDiPuntaEstiva != null ? `massimo della somma oraria, alle ${d.oraDiPuntaEstiva}:00` : null}
+        />
         <Riga
           label="Fabbisogno dimensionante"
           value={formattaKw(d.sommaFabbisogniKw)}

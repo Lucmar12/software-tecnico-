@@ -26,6 +26,7 @@ import { calcolaFattoreDeratingBassaTemperatura } from "../src/utils/deratingPom
 import { calcolaBollitore, kwToBtu, btuToKw, TRASMITTANZE_PER_EPOCA, MAGGIORAZIONE_PONTI_TERMICI_PER_EPOCA, RICAMBI_ARIA_PER_TIPO_LOCALE, ZONE_CLIMATICHE, TAGLIE_COMMERCIALI_BTU, TAGLIE_BOLLITORE_STANDARD, EFFICIENZA_PER_CLASSE, FATTORE_ESPOSIZIONE } from "../src/data/calculations.js";
 import { PARAMETRI_CALCOLO, parametro, parametroDefault } from "../src/utils/parametriCalcolo.js";
 import { calcolaSuperficieMuriEsterni, sviluppoParetiEsterne, areaFinestra, normalizzaGeometria } from "../src/utils/stime.js";
+import { ORE_DI_CALCOLO, quotaIrraggiamento, temperaturaEsternaOraria, ESCURSIONE_DEFAULT_K } from "../src/utils/profiliOrari.js";
 
 let passati = 0;
 const falliti = [];
@@ -160,23 +161,79 @@ function ambienteRiferimento(extra = {}) {
 {
   const r = calcolaAmbienteConOverride(ambienteRiferimento(), COMUNE);
   const e = r.scomposizioneEstiva;
-  // ΔT estivo = 32 − 26 = 6 K; incremento sole-aria sud = +8 K
-  // Q_trasm = 0,7 × 10,42 × (6+8) + 3,0 × 3,08 × 6 = 102,116 + 55,440 = 157,556 W
-  uguale("apporto per trasmissione estivo [kW]", e.trasmissioneKw, 0.157556, 0.001);
-  // Q_solare = 3,08 m² × 300 W/m² (sud) × 0,5 (schermatura) = 462 W
+  // L'ambiente è esposto a sud: va in punta a mezzogiorno, quando riceve il
+  // 100% del proprio irraggiamento. A quell'ora l'aria esterna non è ancora
+  // al massimo giornaliero: T(12) = 32 − 10 K di escursione × 0,20 = 30 °C,
+  // quindi ΔT = 30 − 26 = 4 K (il massimo di 32 °C arriva alle 16, quando
+  // però il sole sulla facciata sud è già calato al 45%).
+  uguale("ora di punta dell'ambiente a sud", r.oraDiPunta, 12);
+  uguale("temperatura esterna all'ora di punta [°C]", e.temperaturaEsterna, 30, 1e-9);
+  uguale("quota di irraggiamento all'ora di punta", e.quotaIrraggiamento, 1, 1e-9);
+  // Q_trasm = 0,7 × 10,42 × (4 + 8) + 3,0 × 3,08 × 4 = 87,528 + 36,960 = 124,488 W
+  uguale("apporto per trasmissione estivo [kW]", e.trasmissioneKw, 0.124488, 0.001);
+  // Q_solare = 3,08 m² × 300 W/m² (sud) × 0,5 (schermatura) × 1,00 = 462 W
   uguale("apporto solare [kW]", e.solareKw, 0.462, 0.001);
   // Q_persone = 2 × 130 = 260 W;  Q_apparecchi = 20 × 8 = 160 W
   uguale("apporto persone [kW]", e.personeKw, 0.26, 0.001);
   uguale("apporto apparecchiature [kW]", e.apparecchiKw, 0.16, 0.001);
   // portata di rinnovo = 0,5 vol/h × 54 m³ = 27 m³/h
-  // sensibile = 0,34 × 27 × 6 = 55,08 W
-  // latente   = 0,83 × 27 × 4,5 g/kg = 100,85 W
-  uguale("rinnovo aria, quota sensibile [kW]", e.ventilazioneSensibileKw, 0.05508, 0.001);
+  // sensibile = 0,34 × 27 × 4 = 36,72 W
+  // latente   = 0,83 × 27 × 4,5 g/kg = 100,85 W (non dipende dall'ora)
+  uguale("rinnovo aria, quota sensibile [kW]", e.ventilazioneSensibileKw, 0.03672, 0.001);
   uguale("rinnovo aria, quota latente [kW]", e.ventilazioneLatenteKw, 0.100845, 0.001);
   // La quota latente non può essere dimenticata: su questo ambiente supera la sensibile.
   vero("quota latente maggiore della sensibile sul rinnovo", e.ventilazioneLatenteKw > e.ventilazioneSensibileKw);
-  // totale = (157,556+462+260+160+55,08+100,845) × 1,10 (margine) = 1.315,03 W
-  uguale("carico estivo totale [kW]", r.estivoKw, 1.315029, 0.001);
+  // totale = (124,488+462+260+160+36,72+100,845) × 1,10 (margine) = 1.258,46 W
+  uguale("carico estivo totale [kW]", r.estivoKw, 1.258458, 0.001);
+  // Il massimo del profilo coincide con il valore dichiarato.
+  uguale("il carico estivo è il massimo del profilo orario", Math.max(...r.profiloEstivo.map((v) => v.kw)), r.estivoKw, 1e-12);
+}
+
+// ---------------------------------------------------------------------
+// CONTEMPORANEITÀ ESTIVA — est e ovest non vanno in punta alla stessa ora
+// ---------------------------------------------------------------------
+{
+  // Profili: l'est riceve il massimo alle 8, l'ovest alle 16, il sud a
+  // mezzogiorno. È il moto del sole, e nessuna delle tre ore coincide.
+  uguale("l'est è al massimo alle 8", quotaIrraggiamento("est", 8), 1, 1e-9);
+  uguale("l'ovest è al massimo alle 16", quotaIrraggiamento("ovest", 16), 1, 1e-9);
+  uguale("il sud è al massimo alle 12", quotaIrraggiamento("sud", 12), 1, 1e-9);
+  vero("alle 8 l'ovest riceve poco", quotaIrraggiamento("ovest", 8) < 0.25);
+  vero("alle 16 l'est riceve poco", quotaIrraggiamento("est", 16) < 0.25);
+
+  // La temperatura esterna tocca il massimo alle 16, non a mezzogiorno.
+  uguale("massimo di temperatura alle 16", temperaturaEsternaOraria(32, 10, 16), 32, 1e-9);
+  uguale("alle 8 la temperatura è più bassa di 3/4 dell'escursione", temperaturaEsternaOraria(32, 10, 8), 24.5, 1e-9);
+  uguale("senza escursione nei dati si assume il valore convenzionale", temperaturaEsternaOraria(32, undefined, 8), 32 - ESCURSIONE_DEFAULT_K * 0.75, 1e-9);
+
+  const est = ambienteRiferimento({ nome: "Est", esposizionePrevalente: "est" });
+  const ovest = ambienteRiferimento({ nome: "Ovest", esposizionePrevalente: "ovest" });
+  const edificio = calcolaEdificioConOverride([est, ovest], COMUNE);
+  const rEst = edificio.risultatiAmbienti[0];
+  const rOvest = edificio.risultatiAmbienti[1];
+
+  uguale("l'ambiente a est va in punta la mattina", rEst.oraDiPunta, 8);
+  uguale("l'ambiente a ovest va in punta nel pomeriggio", rOvest.oraDiPunta, 16);
+
+  // Il totale dell'edificio è il massimo della somma ora per ora, che è
+  // sempre minore della somma dei due picchi presi separatamente.
+  const sommaPicchi = rEst.estivoKw + rOvest.estivoKw;
+  vero("il totale simultaneo è minore della somma dei picchi", edificio.totaleEstivoKw < sommaPicchi, `${edificio.totaleEstivoKw.toFixed(3)} < ${sommaPicchi.toFixed(3)}`);
+  uguale("la somma dei picchi è riportata per trasparenza", edificio.sommaPicchiEstiviKw, sommaPicchi, 1e-9);
+  vero("la riduzione per contemporaneità è dichiarata", edificio.riduzionePerContemporaneitaPct > 0);
+
+  // Il totale coincide con il massimo della somma calcolata a mano ora per ora.
+  const sommeOrarie = ORE_DI_CALCOLO.map((ora, i) => rEst.profiloEstivo[i].kw + rOvest.profiloEstivo[i].kw);
+  uguale("totale estivo = massimo della somma oraria", edificio.totaleEstivoKw, Math.max(...sommeOrarie), 1e-12);
+  uguale("ora di punta dell'edificio", edificio.oraDiPuntaEstiva, ORE_DI_CALCOLO[sommeOrarie.indexOf(Math.max(...sommeOrarie))]);
+
+  // Con ambienti tutti uguali non c'è nulla da sfasare: totale = somma.
+  const gemelli = calcolaEdificioConOverride([ambienteRiferimento(), ambienteRiferimento()], COMUNE);
+  uguale("ambienti con la stessa esposizione non beneficiano della contemporaneità", gemelli.totaleEstivoKw, gemelli.sommaPicchiEstiviKw, 1e-9);
+
+  // Il generatore centralizzato usa lo stesso totale simultaneo.
+  const vrf = calcolaDimensionamentoVRF(edificio.risultatiAmbienti, { fattoreContemporaneita: 1, lunghezzaEquivalenteM: 10, dislivelloM: 3 }, null);
+  uguale("il VRF parte dal totale estivo simultaneo", vrf.totaleEstivoKw, edificio.totaleEstivoKw, 1e-9);
 }
 
 // ---------------------------------------------------------------------

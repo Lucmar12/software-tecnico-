@@ -102,7 +102,9 @@ export default function RelazioneCalcolo({ scenari, scenarioProgetto, comune, ac
                 accento="estivo"
                 label="Fabbisogno estivo totale"
                 value={formattaKw(scenario.edificio.totaleEstivoKw)}
-                sotto={`${formattaBtu(scenario.edificio.totaleEstivoBtu)} · ${formattaFrigorie(scenario.edificio.totaleEstivoKw)}`}
+                sotto={`${formattaBtu(scenario.edificio.totaleEstivoBtu)} · ${formattaFrigorie(scenario.edificio.totaleEstivoKw)}${
+                  scenario.edificio.oraDiPuntaEstiva != null ? ` · punta alle ${scenario.edificio.oraDiPuntaEstiva}:00` : ""
+                }`}
               />
               <RiepilogoCard
                 accento="superficie"
@@ -126,6 +128,21 @@ export default function RelazioneCalcolo({ scenari, scenarioProgetto, comune, ac
                 sotto="Classe rappresentativa A++, mix elettrico medio IT"
               />
             </div>
+            {scenario.edificio.riduzionePerContemporaneitaPct > 0.5 && (
+              <p className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-lg p-3">
+                <span className="font-semibold text-slate-700">Contemporaneità estiva.</span> Gli ambienti non vanno
+                in punta alla stessa ora: uno esposto a est raggiunge il massimo a metà mattina, uno a ovest nel tardo
+                pomeriggio. Sommando i picchi dei singoli ambienti si otterrebbero{" "}
+                {formattaKw(scenario.edificio.sommaPicchiEstiviKw)}, ma nell'ora peggiore — le{" "}
+                {scenario.edificio.oraDiPuntaEstiva}:00 — l'edificio ne chiede{" "}
+                {formattaKw(scenario.edificio.totaleEstivoKw)}:{" "}
+                <span className="font-semibold text-emerald-700">
+                  {scenario.edificio.riduzionePerContemporaneitaPct.toFixed(0)}% di potenza in meno
+                </span>{" "}
+                da installare, senza scoprire nulla.
+              </p>
+            )}
+
             <AnalisiCritica edificio={scenario.edificio} />
             <FotovoltaicoDettaglio edificio={scenario.edificio} comune={comune} fotovoltaico={fotovoltaico} />
           </section>

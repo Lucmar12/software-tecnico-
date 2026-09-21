@@ -4,6 +4,7 @@ import { nuovoAmbiente, aggiornaCampoAmbiente, pianoAmbiente, impostaPianoAmbien
 import { OPZIONI_PARETI_ESTERNE, TIPI_FINESTRA } from "../utils/stime.js";
 import { validaAmbiente } from "../utils/validazione.js";
 import { calcolaAmbienteConOverride, isAmbienteNonStandard } from "../utils/overrides.js";
+import { profiloEstivoEdificio } from "../utils/profiliOrari.js";
 import { ETICHETTE_EPOCA, ETICHETTE_TIPO_LOCALE } from "../data/calculations.js";
 
 /** Etichette brevi per le celle: il testo completo resta nel tooltip e nei dettagli. */
@@ -120,7 +121,12 @@ export default function AmbientiTabella({ ambienti, onChange, comune }) {
   const totaleSuperficie = ambienti.reduce((s, a) => s + (Number(a.superficiePavimento) || 0), 0);
   const calcolati = risultati.filter((r) => r.calcolo);
   const totaleInvernale = calcolati.reduce((s, r) => s + r.calcolo.invernaleKw, 0);
-  const totaleEstivo = calcolati.reduce((s, r) => s + r.calcolo.estivoKw, 0);
+  // Il totale estivo NON è la somma della colonna: ogni ambiente porta il
+  // proprio picco, ma i picchi cadono a ore diverse. Si somma ora per ora
+  // e si prende il massimo, coerentemente con la relazione di calcolo.
+  const estivoEdificio = profiloEstivoEdificio(calcolati.map((r) => r.calcolo));
+  const totaleEstivo = estivoEdificio.massimoKw;
+  const sfasamentoEstivo = estivoEdificio.riduzionePerContemporaneitaPct > 0.5;
   const totaliCompleti = comune && calcolati.length === ambienti.length && ambienti.length > 0;
   const numeroColonne = 14;
 
@@ -299,7 +305,9 @@ export default function AmbientiTabella({ ambienti, onChange, comune }) {
                   ? "Seleziona il comune per vedere i carichi"
                   : !totaliCompleti
                   ? "Totale parziale: correggi le righe in rosso"
-                  : "Somma dei carichi di picco dei singoli ambienti"}
+                  : sfasamentoEstivo
+                  ? `Estivo: massimo alle ${estivoEdificio.oraDiPunta}:00, non la somma della colonna — gli ambienti non vanno in punta alla stessa ora`
+                  : "Invernale: somma dei carichi. Estivo: massimo della somma ora per ora"}
               </td>
               <td className={`${cella} pr-3 py-2 z-10 bg-slate-50 ${fissaDestra}`}>
                 <div className="flex items-center gap-1">

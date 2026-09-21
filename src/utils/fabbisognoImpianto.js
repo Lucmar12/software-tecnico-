@@ -21,7 +21,13 @@
  * Resta invece corretto usare il massimo per ambiente quando la macchina
  * serve QUEL solo ambiente (climatizzatore split): lì la stessa unità
  * deve coprire entrambe le stagioni di quel locale.
+ *
+ * Lo stesso principio vale dentro la stagione estiva: il totale non è la
+ * somma dei picchi dei singoli ambienti, ma il massimo della loro somma
+ * ora per ora (vedi utils/profiliOrari.js). Est e ovest non vanno in
+ * punta insieme.
  */
+import { profiloEstivoEdificio } from "./profiliOrari.js";
 
 /**
  * @param {Array<{invernaleKw:number, estivoKw:number, fabbisognoDimensionamento:number}>} risultatiAmbienti
@@ -31,7 +37,8 @@
  */
 export function fabbisognoDiImpianto(risultatiAmbienti) {
   const totaleInvernaleKw = risultatiAmbienti.reduce((s, r) => s + r.invernaleKw, 0);
-  const totaleEstivoKw = risultatiAmbienti.reduce((s, r) => s + r.estivoKw, 0);
+  const estivo = profiloEstivoEdificio(risultatiAmbienti);
+  const totaleEstivoKw = estivo.massimoKw;
   const sommaFabbisogniKw = Math.max(totaleInvernaleKw, totaleEstivoKw);
 
   // Conservato per trasparenza in relazione: quanto si sarebbe speso in
@@ -41,6 +48,7 @@ export function fabbisognoDiImpianto(risultatiAmbienti) {
   return {
     totaleInvernaleKw,
     totaleEstivoKw,
+    oraDiPuntaEstiva: estivo.oraDiPunta,
     sommaFabbisogniKw,
     stagioneDimensionante: totaleEstivoKw > totaleInvernaleKw ? "estiva" : "invernale",
     sommaMassimiPerAmbienteKw,

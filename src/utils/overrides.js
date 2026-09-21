@@ -22,6 +22,7 @@
 import { TRASMITTANZE_PER_EPOCA, COEFF_CALORE_LATENTE_W_PER_MCH_G, kwToBtu, scegliTagliaCommerciale } from "../data/calculations.js";
 import { parametro, parametriSovrascritti, CAPACITA_TERMICA_ARIA } from "./parametriCalcolo.js";
 import { normalizzaGeometria } from "./stime.js";
+import { ORE_DI_CALCOLO, quotaIrraggiamento, temperaturaEsternaOraria, profiloEstivoEdificio } from "./profiliOrari.js";
 
 /** Trasmittanze effettivamente in uso per l'ambiente: override manuale se presente, altrimenti valore da epoca costruttiva. */
 export function getTrasmittanzeEffettive(ambiente) {
@@ -103,23 +104,49 @@ export function calcolaAmbienteConOverride(ambienteGrezzo, comune) {
   const ventilazioneW = CAPACITA_TERMICA_ARIA * ricambiAriaOra * volumeAmbiente * deltaTInv;
   const invernaleKw = (trasmissioneW + ventilazioneW) / 1000;
 
-  // --- Estivo (metodo Carrier) ---
-  const deltaTEst = tbse - tempInternaEstiva;
-  // Temperatura sole-aria sulla quota di muro realmente esposta all'irraggiamento (esclusa la quota verso locale non riscaldato); fattore b sulla quota interna.
-  const deltaTEstMuroEffettivo =
-    (1 - frazioneNonRiscaldata) * (deltaTEst + incrementoSoleAria) + frazioneNonRiscaldata * (deltaTEst * fattoreB);
-  const Q_trasmEst = U.muro * superficieMuroNetta * deltaTEstMuroEffettivo + U.vetro * ambiente.superficieFinestre * deltaTEst;
-  const Q_solare = ambiente.superficieFinestre * apportoSolareWm2 * fattoreSchermatura;
+  // --- Estivo (metodo Carrier, valutato a più ore del giorno) ---
+  // Il carico estivo non è un numero unico: irraggiamento e temperatura
+  // esterna cambiano ora per ora. Si calcola a ogni ora e si prende il
+  // massimo, che per questo ambiente è la sua ora di punta.
+  const portataRinnovoMch = ricambiAriaOra * volumeAmbiente; // [m³/h]
   const Q_persone = ambiente.numeroOccupanti * apportoPersonaW;
   const Q_apparecchi = ambiente.superficiePavimento * apportoApparecchiWm2;
-  const portataRinnovoMch = ricambiAriaOra * volumeAmbiente; // [m³/h]
-  const Q_ventEstSensibile = CAPACITA_TERMICA_ARIA * portataRinnovoMch * deltaTEst;
-  // Quota latente: deumidificazione dell'aria di rinnovo. Omessa nel
-  // calcolo sensibile puro, ma parte del carico totale a cui è dichiarata
-  // la potenza frigorifera delle macchine.
+  // Quota latente: deumidificazione dell'aria di rinnovo. Non dipende
+  // dall'ora, perché l'umidità specifica esterna di progetto è un dato
+  // giornaliero e non un andamento.
   const Q_ventEstLatente = COEFF_CALORE_LATENTE_W_PER_MCH_G * portataRinnovoMch * deltaUmiditaGKg;
-  const Q_ventEst = Q_ventEstSensibile + Q_ventEstLatente;
-  const estivoKw = ((Q_trasmEst + Q_solare + Q_persone + Q_apparecchi + Q_ventEst) * (1 + margineSicurezza)) / 1000;
+
+  const profiloEstivo = ORE_DI_CALCOLO.map((ora) => {
+    const quota = quotaIrraggiamento(ambiente.esposizionePrevalente, ora);
+    const deltaTEst = temperaturaEsternaOraria(tbse, comune?.escursione, ora) - tempInternaEstiva;
+    // L'incremento sole-aria è prodotto dallo stesso irraggiamento che
+    // scalda il vetro: segue lo stesso andamento orario.
+    const soleAriaOra = incrementoSoleAria * quota;
+    const deltaTEstMuroEffettivo =
+      (1 - frazioneNonRiscaldata) * (deltaTEst + soleAriaOra) + frazioneNonRiscaldata * (deltaTEst * fattoreB);
+    const Q_trasmEst = U.muro * superficieMuroNetta * deltaTEstMuroEffettivo + U.vetro * ambiente.superficieFinestre * deltaTEst;
+    const Q_solare = ambiente.superficieFinestre * apportoSolareWm2 * fattoreSchermatura * quota;
+    const Q_ventEstSensibile = CAPACITA_TERMICA_ARIA * portataRinnovoMch * deltaTEst;
+    const totaleW = Q_trasmEst + Q_solare + Q_persone + Q_apparecchi + Q_ventEstSensibile + Q_ventEstLatente;
+    return {
+      ora,
+      kw: (totaleW * (1 + margineSicurezza)) / 1000,
+      quotaIrraggiamento: quota,
+      temperaturaEsterna: temperaturaEsternaOraria(tbse, comune?.escursione, ora),
+      componenti: {
+        trasmissioneKw: Q_trasmEst / 1000,
+        solareKw: Q_solare / 1000,
+        personeKw: Q_persone / 1000,
+        apparecchiKw: Q_apparecchi / 1000,
+        ventilazioneSensibileKw: Q_ventEstSensibile / 1000,
+        ventilazioneLatenteKw: Q_ventEstLatente / 1000,
+        incrementoSoleAria: soleAriaOra,
+      },
+    };
+  });
+
+  const puntaEstiva = profiloEstivo.reduce((migliore, voce) => (voce.kw > migliore.kw ? voce : migliore), profiloEstivo[0]);
+  const estivoKw = puntaEstiva.kw;
 
   const fabbisognoDimensionamento = Math.max(invernaleKw, estivoKw);
   const totaleW = trasmissioneW + ventilazioneW || 1;
@@ -143,13 +170,13 @@ export function calcolaAmbienteConOverride(ambienteGrezzo, comune) {
     frazioneNonRiscaldata,
     incrementoSoleAria,
     portataRinnovoMch,
+    profiloEstivo,
+    oraDiPunta: puntaEstiva.ora,
     scomposizioneEstiva: {
-      trasmissioneKw: Q_trasmEst / 1000,
-      solareKw: Q_solare / 1000,
-      personeKw: Q_persone / 1000,
-      apparecchiKw: Q_apparecchi / 1000,
-      ventilazioneSensibileKw: Q_ventEstSensibile / 1000,
-      ventilazioneLatenteKw: Q_ventEstLatente / 1000,
+      ...puntaEstiva.componenti,
+      ora: puntaEstiva.ora,
+      temperaturaEsterna: puntaEstiva.temperaturaEsterna,
+      quotaIrraggiamento: puntaEstiva.quotaIrraggiamento,
       deltaUmiditaGKg,
       margineSicurezza,
     },
@@ -181,7 +208,12 @@ export function calcolaAmbienteConOverride(ambienteGrezzo, comune) {
 export function calcolaEdificioConOverride(ambienti, comune) {
   const risultatiAmbienti = ambienti.map((a) => calcolaAmbienteConOverride(a, comune));
   const totaleInvernaleKw = risultatiAmbienti.reduce((s, r) => s + r.invernaleKw, 0);
-  const totaleEstivoKw = risultatiAmbienti.reduce((s, r) => s + r.estivoKw, 0);
+  // Il totale estivo è il massimo della SOMMA ora per ora, non la somma
+  // dei massimi: una stanza a est e una a ovest non vanno in punta alla
+  // stessa ora, e sommare i due picchi descriverebbe un istante che non
+  // esiste.
+  const estivoEdificio = profiloEstivoEdificio(risultatiAmbienti);
+  const totaleEstivoKw = estivoEdificio.massimoKw;
   const superficieTotale = ambienti.reduce((s, a) => s + a.superficiePavimento, 0);
   return {
     risultatiAmbienti,
@@ -189,6 +221,10 @@ export function calcolaEdificioConOverride(ambienti, comune) {
     totaleEstivoKw,
     totaleInvernaleBtu: kwToBtu(totaleInvernaleKw),
     totaleEstivoBtu: kwToBtu(totaleEstivoKw),
+    profiloEstivo: estivoEdificio.profilo,
+    oraDiPuntaEstiva: estivoEdificio.oraDiPunta,
+    sommaPicchiEstiviKw: estivoEdificio.sommaPicchiKw,
+    riduzionePerContemporaneitaPct: estivoEdificio.riduzionePerContemporaneitaPct,
     superficieTotale,
     ambientePiuCritico: risultatiAmbienti.reduce((peggiore, r) => {
       const intensita = r.invernaleKw / (r.ambiente.superficiePavimento || 1);
