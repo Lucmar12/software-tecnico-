@@ -7,8 +7,8 @@ import { formattaEuro } from "../utils/export.js";
  * classe energetica in primo piano; il prezzo resta presente ma non è
  * l'elemento guida della scelta.
  */
-export default function CatalogoTabella({ fabbisognoKw, tipo = "climatizzatore_split", titolo, numeroUnitaRichieste = null }) {
-  const { consigliati, messaggio } = trovaProdottiConsigliati(fabbisognoKw, tipo, numeroUnitaRichieste);
+export default function CatalogoTabella({ fabbisognoKw, tipo = "climatizzatore_split", titolo, numeroUnitaRichieste = null, tipologiaTerminale = null }) {
+  const { consigliati, messaggio, avviso } = trovaProdottiConsigliati(fabbisognoKw, tipo, numeroUnitaRichieste, tipologiaTerminale);
 
   if (messaggio) {
     return (
@@ -22,6 +22,7 @@ export default function CatalogoTabella({ fabbisognoKw, tipo = "climatizzatore_s
   return (
     <div className="overflow-x-auto">
       {titolo && <div className="font-medium text-slate-700 mb-2">{titolo}</div>}
+      {avviso && <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 mb-2">{avviso}</p>}
       <table className="w-full text-sm border border-slate-200 rounded-lg overflow-hidden">
         <thead className="bg-slate-100 text-slate-600">
           <tr>

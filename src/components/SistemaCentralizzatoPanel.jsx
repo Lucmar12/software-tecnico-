@@ -1,6 +1,7 @@
 import React from "react";
 import { FATTORE_CONTEMPORANEITA_DEFAULT } from "../utils/vrf.js";
 import { FATTORE_CONTEMPORANEITA_CHILLER_DEFAULT } from "../utils/chiller.js";
+import { TIPOLOGIE_TERMINALE } from "../data/gammaAux.js";
 
 const inputCls = "mt-1 w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-brand-400";
 
@@ -14,11 +15,44 @@ const inputCls = "mt-1 w-full border border-slate-300 rounded-lg px-2.5 py-1.5 t
  * per servirne più di uno).
  */
 export default function SistemaCentralizzatoPanel({ sistemaCentralizzato, onChange, numeroAmbienti }) {
+  const tipologiaScelta = sistemaCentralizzato.tipologiaTerminale ?? "parete";
+
+  function setTipologia(tipologiaTerminale) {
+    onChange({ ...sistemaCentralizzato, tipologiaTerminale });
+  }
+
+  // La scelta del terminale vale sempre, anche con un solo ambiente: il
+  // centralizzato no, ha senso solo servendone più di uno.
+  const sceltaTerminale = (
+    <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+      <div>
+        <h3 className="font-semibold text-slate-800">Che tipo di unità vuoi installare?</h3>
+        <p className="text-xs text-slate-400 mt-0.5">
+          Non cambia il fabbisogno calcolato, ma cambia la macchina proposta, l'installazione e il prezzo.
+        </p>
+      </div>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-2">
+        {TIPOLOGIE_TERMINALE.map((t) => (
+          <OpzioneTipo
+            key={t.valore}
+            attivo={tipologiaScelta === t.valore}
+            onClick={() => setTipologia(t.valore)}
+            titolo={t.etichetta}
+            descrizione={t.descrizione}
+          />
+        ))}
+      </div>
+    </div>
+  );
+
   if (numeroAmbienti < 2) {
     return (
-      <div className="bg-slate-50 border border-dashed border-slate-300 rounded-xl p-4 text-xs text-slate-500">
-        Sistema centralizzato (VRF o chiller) — disponibile aggiungendo almeno un secondo ambiente: un impianto
-        centralizzato ha senso solo per servirne più di uno.
+      <div className="space-y-3">
+        {sceltaTerminale}
+        <div className="bg-slate-50 border border-dashed border-slate-300 rounded-xl p-4 text-xs text-slate-500">
+          Sistema centralizzato (multisplit o chiller) — disponibile aggiungendo almeno un secondo ambiente: un
+          impianto centralizzato ha senso solo per servirne più di uno.
+        </div>
       </div>
     );
   }
@@ -32,7 +66,10 @@ export default function SistemaCentralizzatoPanel({ sistemaCentralizzato, onChan
   }
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+    <div className="space-y-3">
+      {sceltaTerminale}
+
+      <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
       <h3 className="font-semibold text-slate-800">Sistema di distribuzione</h3>
       <div className="grid sm:grid-cols-3 gap-2">
         <OpzioneTipo
@@ -120,6 +157,7 @@ export default function SistemaCentralizzatoPanel({ sistemaCentralizzato, onChan
           </label>
         </div>
       )}
+      </div>
     </div>
   );
 }

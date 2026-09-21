@@ -27,6 +27,8 @@ import { calcolaBollitore, kwToBtu, btuToKw, TRASMITTANZE_PER_EPOCA, MAGGIORAZIO
 import { PARAMETRI_CALCOLO, parametro, parametroDefault } from "../src/utils/parametriCalcolo.js";
 import { stimaConsumoAnnuoClimatizzazione } from "../src/utils/fotovoltaico.js";
 import { COLONNE_AMBIENTI, CONVENZIONI_TABELLA, intestazioneColonna } from "../src/utils/colonneAmbienti.js";
+import { CATALOGO_PRODOTTI, trovaProdottiConsigliati } from "../src/data/catalogo.js";
+import { MONOSPLIT_AUX, LIGHT_COMMERCIAL_AUX, UNITA_INTERNE_MULTI_AUX, UNITA_ESTERNE_MULTI_AUX, capacitaGarantita, prezzoSistema } from "../src/data/gammaAux.js";
 import { calcolaSuperficieMuriEsterni, sviluppoParetiEsterne, areaFinestra, normalizzaGeometria } from "../src/utils/stime.js";
 import { ORE_DI_CALCOLO, quotaIrraggiamento, temperaturaEsternaOraria, ESCURSIONE_DEFAULT_K } from "../src/utils/profiliOrari.js";
 
@@ -494,6 +496,57 @@ function ambienteRiferimento(extra = {}) {
   ugualeTesto("intestazione con unità di misura", intestazioneColonna({ intestazione: "Alt.", unita: "m" }), "Alt. [m]");
   ugualeTesto("intestazione senza unità", intestazioneColonna({ intestazione: "Tipo" }), "Tipo");
   vero("le convenzioni grafiche sono spiegate", CONVENZIONI_TABELLA.length >= 3 && CONVENZIONI_TABELLA.every((v) => v.testo.length > 20));
+}
+
+// ---------------------------------------------------------------------
+// CATALOGO CLIMATIZZAZIONE — gamma AUX, listino 2026
+//
+// I prezzi finiscono in un preventivo che il cliente legge: un numero
+// sbagliato qui costa denaro vero. I controlli confrontano il catalogo
+// con alcune voci del listino trascritte indipendentemente.
+// ---------------------------------------------------------------------
+{
+  uguale("monosplit a listino", MONOSPLIT_AUX.length, 12);
+  uguale("macchine light commercial a listino", LIGHT_COMMERCIAL_AUX.length, 17);
+  uguale("unità interne multisplit a listino", UNITA_INTERNE_MULTI_AUX.length, 23);
+  uguale("unità esterne multisplit a listino", UNITA_ESTERNE_MULTI_AUX.length, 9);
+
+  // Prezzo di sistema = unità interna + unità esterna, come da listino.
+  const caPro09 = MONOSPLIT_AUX.find((m) => m.modello === "CA-PRO-09");
+  uguale("CA-PRO-09: 435 € interna + 865 € esterna", prezzoSistema(caPro09), 1300);
+  const q24 = MONOSPLIT_AUX.find((m) => m.modello === "Q-24");
+  uguale("Q-24: 645 € + 1.070 €", prezzoSistema(q24), 1715);
+  const can36 = LIGHT_COMMERCIAL_AUX.find((m) => m.modello === "CANALIZZABILE-36");
+  uguale("Canalizzabile 36: 1.644 € + 2.466 €", prezzoSistema(can36), 4110);
+  const ue42 = UNITA_ESTERNE_MULTI_AUX.find((u) => u.modello === "UE Multisplit 42K");
+  uguale("unità esterna multisplit 42K", ue42.prezzo, 4115);
+  uguale("la 42K accetta cinque unità interne", ue42.attacchi, 5);
+
+  // La capacità usata per la scelta è la minore fra freddo e caldo:
+  // la macchina deve coprire entrambe le stagioni.
+  uguale("capacità garantita della CA-PRO-24 (7,3 freddo / 7,2 caldo)", capacitaGarantita(MONOSPLIT_AUX.find((m) => m.modello === "CA-PRO-24")), 7.2, 1e-9);
+
+  // Ogni prodotto di climatizzazione deve avere prezzo e capacità reali.
+  const climatizzazione = CATALOGO_PRODOTTI.filter((p) => ["climatizzatore_split", "vrf", "unita_interna_multi"].includes(p.tipo));
+  vero("nessun prodotto segnaposto fra i climatizzatori", climatizzazione.every((p) => !String(p.marchio).includes("PLACEHOLDER")));
+  vero("ogni climatizzatore ha un prezzo positivo", climatizzazione.every((p) => p.prezzoIndicativoMin > 0));
+  vero("ogni climatizzatore ha una capacità positiva", climatizzazione.every((p) => p.potenzaKw > 0));
+  vero("ogni climatizzatore dichiara i codici del costruttore", climatizzazione.every((p) => p.codiceUnitaInterna || p.codiceUnitaEsterna));
+  vero("prezzo di listino unico, non un intervallo inventato", climatizzazione.every((p) => p.prezzoIndicativoMin === p.prezzoIndicativoMax));
+
+  // La tipologia di terminale filtra davvero: a parità di fabbisogno
+  // ciascuna scelta propone macchine della propria famiglia.
+  for (const tipologia of ["parete", "canalizzabile", "cassette"]) {
+    const r = trovaProdottiConsigliati(5.0, "climatizzatore_split", null, tipologia);
+    vero(`la scelta "${tipologia}" propone solo macchine di quel tipo`, r.consigliati.length > 0 && r.consigliati.every((p) => p.tipologiaTerminale === tipologia), r.messaggio || "");
+  }
+  // Senza filtro le macchine a parete, più economiche, coprirebbero i primi posti.
+  const senzaFiltro = trovaProdottiConsigliati(5.0, "climatizzatore_split");
+  vero("senza scelta di tipologia si vede tutta la gamma", senzaFiltro.consigliati.length > 0);
+
+  // Un'unità esterna multisplit non può essere proposta per meno interne di quante ne servono.
+  const perQuattro = trovaProdottiConsigliati(7.5, "vrf", 4);
+  vero("il multisplit proposto ha abbastanza attacchi", perQuattro.consigliati.every((p) => p.maxUnitaInterne >= 4), perQuattro.messaggio || "");
 }
 
 // ---------------------------------------------------------------------

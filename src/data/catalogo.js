@@ -3,9 +3,14 @@
  * aria-acqua, bollitori/scaldacqua) e logica di abbinamento al
  * fabbisogno calcolato.
  *
- * ATTENZIONE — DATI PLACEHOLDER: i prodotti elencati di seguito (marchio,
- * modello, prezzi indicativi) sono ESEMPI FITTIZI inseriti per rendere
- * l'applicazione funzionante da subito. Il listino reale dei marchi
+ * CLIMATIZZAZIONE: dati REALI, gamma AUX listino Italia 2026 — vedi
+ * data/gammaAux.js per la fonte e data/catalogoClimatizzazione.js per la
+ * conversione nello schema di questo catalogo.
+ *
+ * ATTENZIONE — LE ALTRE CATEGORIE SONO ANCORA PLACEHOLDER: bollitori,
+ * scaldacqua, solare, fotovoltaico, addolcitori e pompe elencati di
+ * seguito sono ESEMPI FITTIZI inseriti per rendere l'applicazione
+ * funzionante da subito. Il listino reale dei marchi
  * rappresentati dovrà sostituire questo array MANTENENDO ESATTAMENTE LA
  * STESSA STRUTTURA DATI (stessi campi, stessi nomi di chiave, stesse
  * unità di misura) per non richiedere modifiche al resto dell'applicazione.
@@ -41,134 +46,15 @@
  *   note                   : string
  */
 
+import { PRODOTTI_CLIMATIZZAZIONE_AUX } from "./catalogoClimatizzazione.js";
+
 export const CATALOGO_PRODOTTI = [
   // ------------------------------------------------------------------
-  // CLIMATIZZATORI SPLIT — PLACEHOLDER, marchio "AeroClima" (fittizio)
+  // CLIMATIZZAZIONE — gamma AUX, listino Italia 2026 (dati reali)
+  // Generata da data/gammaAux.js: i prezzi di sistema non sono
+  // trascritti a mano ma sommati da unità interna ed esterna.
   // ------------------------------------------------------------------
-  {
-    marchio: "AeroClima [PLACEHOLDER]",
-    modello: "Serie Silent 7000",
-    tipo: "climatizzatore_split",
-    potenzaBtu: 7000,
-    potenzaKw: 2.1,
-    capacitaLitri: null,
-    classeEnergetica: "A+++",
-    seer: 8.5,
-    scop: 4.6,
-    prezzoIndicativoMin: 420,
-    prezzoIndicativoMax: 560,
-    schedaTecnicaUrl: "",
-    note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
-  },
-  {
-    marchio: "AeroClima [PLACEHOLDER]",
-    modello: "Serie Silent 9000",
-    tipo: "climatizzatore_split",
-    potenzaBtu: 9000,
-    potenzaKw: 2.6,
-    capacitaLitri: null,
-    classeEnergetica: "A+++",
-    seer: 8.5,
-    scop: 4.6,
-    prezzoIndicativoMin: 480,
-    prezzoIndicativoMax: 640,
-    schedaTecnicaUrl: "",
-    note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
-  },
-  {
-    marchio: "AeroClima [PLACEHOLDER]",
-    modello: "Serie Comfort 12000",
-    tipo: "climatizzatore_split",
-    potenzaBtu: 12000,
-    potenzaKw: 3.5,
-    capacitaLitri: null,
-    classeEnergetica: "A++",
-    seer: 6.1,
-    scop: 4.0,
-    prezzoIndicativoMin: 590,
-    prezzoIndicativoMax: 780,
-    schedaTecnicaUrl: "",
-    note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
-  },
-  {
-    marchio: "AeroClima [PLACEHOLDER]",
-    modello: "Serie Comfort 18000",
-    tipo: "climatizzatore_split",
-    potenzaBtu: 18000,
-    potenzaKw: 5.3,
-    capacitaLitri: null,
-    classeEnergetica: "A++",
-    seer: 6.1,
-    scop: 4.0,
-    prezzoIndicativoMin: 820,
-    prezzoIndicativoMax: 1050,
-    schedaTecnicaUrl: "",
-    note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
-  },
-
-  // ------------------------------------------------------------------
-  // CLIMATIZZATORI SPLIT — PLACEHOLDER, marchio "NordikAir" (fittizio)
-  // ------------------------------------------------------------------
-  {
-    marchio: "NordikAir [PLACEHOLDER]",
-    modello: "Polar 9",
-    tipo: "climatizzatore_split",
-    potenzaBtu: 9000,
-    potenzaKw: 2.6,
-    capacitaLitri: null,
-    classeEnergetica: "A++",
-    seer: 6.1,
-    scop: 4.0,
-    prezzoIndicativoMin: 400,
-    prezzoIndicativoMax: 520,
-    schedaTecnicaUrl: "",
-    note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
-  },
-  {
-    marchio: "NordikAir [PLACEHOLDER]",
-    modello: "Polar 12",
-    tipo: "climatizzatore_split",
-    potenzaBtu: 12000,
-    potenzaKw: 3.5,
-    capacitaLitri: null,
-    classeEnergetica: "A+",
-    seer: 5.6,
-    scop: 3.8,
-    prezzoIndicativoMin: 510,
-    prezzoIndicativoMax: 670,
-    schedaTecnicaUrl: "",
-    note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
-  },
-  {
-    marchio: "NordikAir [PLACEHOLDER]",
-    modello: "Polar 21",
-    tipo: "climatizzatore_split",
-    potenzaBtu: 21000,
-    potenzaKw: 6.2,
-    capacitaLitri: null,
-    classeEnergetica: "A+",
-    seer: 5.6,
-    scop: 3.8,
-    prezzoIndicativoMin: 980,
-    prezzoIndicativoMax: 1250,
-    schedaTecnicaUrl: "",
-    note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
-  },
-  {
-    marchio: "NordikAir [PLACEHOLDER]",
-    modello: "Polar 24",
-    tipo: "climatizzatore_split",
-    potenzaBtu: 24000,
-    potenzaKw: 7.0,
-    capacitaLitri: null,
-    classeEnergetica: "A",
-    seer: 5.1,
-    scop: 3.4,
-    prezzoIndicativoMin: 1100,
-    prezzoIndicativoMax: 1420,
-    schedaTecnicaUrl: "",
-    note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
-  },
+  ...PRODOTTI_CLIMATIZZAZIONE_AUX,
 
   // ------------------------------------------------------------------
   // POMPE DI CALORE ARIA-ACQUA — PLACEHOLDER, marchio "AeroClima" (fittizio)
@@ -364,92 +250,6 @@ export const CATALOGO_PRODOTTI = [
     scop: 3.0,
     prezzoIndicativoMin: 2100,
     prezzoIndicativoMax: 2600,
-    schedaTecnicaUrl: "",
-    note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
-  },
-
-  // ------------------------------------------------------------------
-  // SISTEMI VRF/MULTI-SPLIT CENTRALIZZATI — PLACEHOLDER, marchio "AeroClima" (fittizio)
-  // Potenza riferita all'unità esterna, dopo derating per lunghezza
-  // tubazioni/dislivello (vedi utils/vrf.js).
-  // ------------------------------------------------------------------
-  {
-    marchio: "AeroClima [PLACEHOLDER]",
-    modello: "VRF Compact 8",
-    tipo: "vrf",
-    potenzaBtu: null,
-    potenzaKw: 8,
-    capacitaLitri: null,
-    maxUnitaInterne: 3,
-    classeEnergetica: "A++",
-    seer: 6.5,
-    scop: 4.2,
-    prezzoIndicativoMin: 5200,
-    prezzoIndicativoMax: 6600,
-    schedaTecnicaUrl: "",
-    note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
-  },
-  {
-    marchio: "AeroClima [PLACEHOLDER]",
-    modello: "VRF Compact 12",
-    tipo: "vrf",
-    potenzaBtu: null,
-    potenzaKw: 12,
-    capacitaLitri: null,
-    maxUnitaInterne: 5,
-    classeEnergetica: "A++",
-    seer: 6.5,
-    scop: 4.2,
-    prezzoIndicativoMin: 7100,
-    prezzoIndicativoMax: 8900,
-    schedaTecnicaUrl: "",
-    note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
-  },
-  {
-    marchio: "NordikAir [PLACEHOLDER]",
-    modello: "MultiFlow 16",
-    tipo: "vrf",
-    potenzaBtu: null,
-    potenzaKw: 16,
-    capacitaLitri: null,
-    maxUnitaInterne: 6,
-    classeEnergetica: "A+",
-    seer: 6.0,
-    scop: 4.0,
-    prezzoIndicativoMin: 9300,
-    prezzoIndicativoMax: 11800,
-    schedaTecnicaUrl: "",
-    note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
-  },
-  {
-    marchio: "NordikAir [PLACEHOLDER]",
-    modello: "MultiFlow 22",
-    tipo: "vrf",
-    potenzaBtu: null,
-    potenzaKw: 22,
-    capacitaLitri: null,
-    maxUnitaInterne: 8,
-    classeEnergetica: "A+",
-    seer: 6.0,
-    scop: 4.0,
-    prezzoIndicativoMin: 12600,
-    prezzoIndicativoMax: 15900,
-    schedaTecnicaUrl: "",
-    note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
-  },
-  {
-    marchio: "NordikAir [PLACEHOLDER]",
-    modello: "MultiFlow 28",
-    tipo: "vrf",
-    potenzaBtu: null,
-    potenzaKw: 28,
-    capacitaLitri: null,
-    maxUnitaInterne: 10,
-    classeEnergetica: "A",
-    seer: 5.4,
-    scop: 3.7,
-    prezzoIndicativoMin: 16200,
-    prezzoIndicativoMax: 20400,
     schedaTecnicaUrl: "",
     note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
   },
@@ -787,18 +587,44 @@ const ORDINE_CLASSI_ENERGETICHE = ["A+++", "A++", "A+", "A"];
  * @param {number|null} numeroUnitaRichieste  Solo per tipo "vrf": numero di unità interne necessarie
  * @returns {{consigliati: Array, messaggio: string|null}}
  */
-export function trovaProdottiConsigliati(fabbisognoKw, tipo = "climatizzatore_split", numeroUnitaRichieste = null) {
+export function trovaProdottiConsigliati(fabbisognoKw, tipo = "climatizzatore_split", numeroUnitaRichieste = null, tipologiaTerminale = null) {
   const fabbisognoBtu = fabbisognoKw * 3412;
   const margineMax = 1.25;
   const basatoSuBtu = tipo === "climatizzatore_split";
 
-  const candidati = CATALOGO_PRODOTTI.filter((p) => {
+  const idonei = CATALOGO_PRODOTTI.filter((p) => {
     if (p.tipo !== tipo) return false;
     if (tipo === "vrf" && numeroUnitaRichieste && p.maxUnitaInterne < numeroUnitaRichieste) return false;
+    // La tipologia di terminale (parete, canalizzabile, cassette, console)
+    // e una scelta dell'utente, non un esito del calcolo: senza filtro le
+    // macchine a parete, piu economiche, coprirebbero sempre i primi posti
+    // e le altre tipologie non comparirebbero mai.
+    if (tipologiaTerminale && p.tipologiaTerminale && p.tipologiaTerminale !== tipologiaTerminale) return false;
     const potenzaProdottoBtu = basatoSuBtu ? p.potenzaBtu : p.potenzaKw * 3412;
     const potenzaRichiestaBtu = basatoSuBtu ? fabbisognoBtu : fabbisognoKw * 3412;
-    return potenzaProdottoBtu >= potenzaRichiestaBtu && potenzaProdottoBtu <= potenzaRichiestaBtu * margineMax;
+    return potenzaProdottoBtu >= potenzaRichiestaBtu;
   });
+
+  const potenzaDi = (p) => (basatoSuBtu ? p.potenzaBtu : p.potenzaKw * 3412);
+  const richiestaBtu = basatoSuBtu ? fabbisognoBtu : fabbisognoKw * 3412;
+
+  /*
+   * Si preferiscono le macchine entro il margine del 25% sul fabbisogno:
+   * sovradimensionare costa di più e fa lavorare l'inverter a carico
+   * parziale. Ma un catalogo reale parte da una taglia minima — la più
+   * piccola AUX rende 2,7 kW — e per un ambiente piccolo NESSUNA macchina
+   * cade in quella finestra. Rispondere "nessun modello" sarebbe falso:
+   * la macchina esiste, è solo la più piccola disponibile. Si propone
+   * quella, dichiarando il sovradimensionamento.
+   */
+  const entroMargine = idonei.filter((p) => potenzaDi(p) <= richiestaBtu * margineMax);
+  const soprataglia = entroMargine.length === 0 && idonei.length > 0;
+  const candidati = soprataglia
+    ? (() => {
+        const minima = Math.min(...idonei.map(potenzaDi));
+        return idonei.filter((p) => potenzaDi(p) === minima);
+      })()
+    : entroMargine;
 
   candidati.sort((a, b) => {
     const classeDiff = ORDINE_CLASSI_ENERGETICHE.indexOf(a.classeEnergetica) - ORDINE_CLASSI_ENERGETICHE.indexOf(b.classeEnergetica);
@@ -816,7 +642,18 @@ export function trovaProdottiConsigliati(fabbisognoKw, tipo = "climatizzatore_sp
     };
   }
 
-  return { consigliati, messaggio: null };
+  if (soprataglia) {
+    const potenzaMinimaKw = basatoSuBtu ? consigliati[0].potenzaBtu / 3412 : consigliati[0].potenzaKw;
+    return {
+      consigliati,
+      messaggio: null,
+      avviso: `Il fabbisogno calcolato (${fabbisognoKw.toFixed(2)} kW) è inferiore alla taglia più piccola a catalogo (${potenzaMinimaKw.toFixed(
+        2
+      )} kW): la macchina proposta è la minima disponibile e risulta sovradimensionata. Con le macchine inverter è una condizione accettabile, ma valuta se accorpare più ambienti su un unico impianto.`,
+    };
+  }
+
+  return { consigliati, messaggio: null, avviso: null };
 }
 
 /** Individua i pannelli solari termici a catalogo idonei a fornire una data capacità di accumulo integrativa [litri], stessa logica di margine +25% max. */

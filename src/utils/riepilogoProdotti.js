@@ -34,7 +34,7 @@ import {
   specificaPompa,
 } from "./specificheProdotto.js";
 
-function voceDaRisultato(chiave, icona, titolo, { consigliati, messaggio }, specificaFn) {
+function voceDaRisultato(chiave, icona, titolo, { consigliati, messaggio, avviso = null }, specificaFn) {
   const prodotto = consigliati[0] || null;
   return {
     chiave,
@@ -44,6 +44,7 @@ function voceDaRisultato(chiave, icona, titolo, { consigliati, messaggio }, spec
     alternative: consigliati.slice(1),
     specifica: prodotto ? specificaFn(prodotto) : null,
     messaggio,
+    avviso,
   };
 }
 
@@ -73,7 +74,12 @@ export function calcolaVociRiepilogoProdotti({ tipiImpianto, scenario, comune, a
       const d = calcolaDimensionamentoChiller(edificio.risultatiAmbienti, sistemaCentralizzato, comune?.teInv);
       risultatoClima = trovaProdottiConsigliati(d.potenzaNominaleRichiestaKw, "chiller");
     } else {
-      risultatoClima = trovaProdottiConsigliati(fabbisognoDimensionamento, "climatizzatore_split");
+      risultatoClima = trovaProdottiConsigliati(
+        fabbisognoDimensionamento,
+        "climatizzatore_split",
+        null,
+        sistemaCentralizzato?.tipologiaTerminale
+      );
     }
     voci.push(voceDaRisultato("climatizzazione", "❄️", "Climatizzazione", risultatoClima, specificaClimatizzatore));
 

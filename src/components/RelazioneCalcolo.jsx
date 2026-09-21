@@ -211,7 +211,11 @@ export default function RelazioneCalcolo({ scenari, scenarioProgetto, comune, ac
                     Selezione basata sul fabbisogno di dimensionamento (massimo tra carico invernale ed estivo):{" "}
                     {formattaKw(fabbisognoKw)}.
                   </p>
-                  <CatalogoTabella fabbisognoKw={fabbisognoKw} tipo="climatizzatore_split" />
+                  <CatalogoTabella
+                    fabbisognoKw={fabbisognoKw}
+                    tipo="climatizzatore_split"
+                    tipologiaTerminale={sistemaCentralizzato.tipologiaTerminale}
+                  />
                 </div>
               ) : (
                 <>
