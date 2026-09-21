@@ -2,6 +2,7 @@ import React from "react";
 import DettaglioCalcolo from "./DettaglioCalcolo.jsx";
 import AnalisiCritica from "./AnalisiCritica.jsx";
 import CatalogoTabella from "./CatalogoTabella.jsx";
+import AlternativeDiGamma from "./AlternativeDiGamma.jsx";
 import RichiediPreventivo from "./RichiediPreventivo.jsx";
 import DisclaimerBox, { FooterBranding } from "./DisclaimerBox.jsx";
 import IntestazioneStampa from "./IntestazioneStampa.jsx";
@@ -205,6 +206,11 @@ export default function RelazioneCalcolo({ scenari, scenarioProgetto, comune, ac
             <section key={scenario.id} className="space-y-4 print-break">
               <TitoloScenario scenario={scenario} confrontoAttivo={confrontoAttivo} scenarioDaPreventivare={scenarioDaPreventivare} />
               {mostraSplit ? (
+                <>
+                  <AlternativeDiGamma
+                    fabbisognoKw={fabbisognoKw}
+                    tipologiaTerminale={sistemaCentralizzato.tipologiaTerminale ?? "parete"}
+                  />
                 <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
                   <h3 className="font-semibold text-slate-800">Catalogo tecnico comparativo — climatizzazione</h3>
                   <p className="text-xs text-slate-400">
@@ -217,6 +223,7 @@ export default function RelazioneCalcolo({ scenari, scenarioProgetto, comune, ac
                     tipologiaTerminale={sistemaCentralizzato.tipologiaTerminale}
                   />
                 </div>
+                </>
               ) : (
                 <>
                   <VRFDettaglio risultatiAmbienti={scenario.edificio.risultatiAmbienti} sistemaCentralizzato={sistemaCentralizzato} comune={comune} compatto={true} />

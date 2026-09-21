@@ -47,6 +47,7 @@
  */
 
 import { PRODOTTI_CLIMATIZZAZIONE_AUX } from "./catalogoClimatizzazione.js";
+import { LIVELLI_GAMMA } from "./gammaAux.js";
 
 export const CATALOGO_PRODOTTI = [
   // ------------------------------------------------------------------
@@ -587,6 +588,57 @@ const ORDINE_CLASSI_ENERGETICHE = ["A+++", "A++", "A+", "A"];
  * @param {number|null} numeroUnitaRichieste  Solo per tipo "vrf": numero di unità interne necessarie
  * @returns {{consigliati: Array, messaggio: string|null}}
  */
+/**
+ * Fra i prodotti idonei sceglie quelli della taglia giusta.
+ *
+ * Si preferiscono le macchine entro il margine del 25% sul fabbisogno: a
+ * parità di resa, sovradimensionare costa di più e fa lavorare l'inverter
+ * a carico parziale. Quando però nessuna macchina cade in quella finestra
+ * si prende la taglia più piccola disponibile: il mercato non scende
+ * sotto i 9.000 BTU, quindi per un ambiente che chiede meno quella è
+ * semplicemente la macchina che si installa.
+ */
+function selezionaPerCapacita(prodotti, richiestaBtu, potenzaDi, margineMax = 1.25) {
+  const idonei = prodotti.filter((p) => potenzaDi(p) >= richiestaBtu);
+  if (idonei.length === 0) return [];
+  const entroMargine = idonei.filter((p) => potenzaDi(p) <= richiestaBtu * margineMax);
+  if (entroMargine.length > 0) return entroMargine;
+  const minima = Math.min(...idonei.map(potenzaDi));
+  return idonei.filter((p) => potenzaDi(p) === minima);
+}
+
+/**
+ * Le tre alternative di gamma sullo stesso fabbisogno: base (serie Q),
+ * intermedia (CU-PRO) e top (CA-PRO).
+ *
+ * Non è un ordinamento per punteggio ma una scelta commerciale da
+ * mettere davanti al cliente: ordinate per prezzo crescente si leggono
+ * come quello che sono, tre offerte fra cui decidere. Le famiglie senza
+ * livelli — canalizzabili, cassette, console — restituiscono l'elenco
+ * normale.
+ */
+export function trovaAlternativeDiGamma(fabbisognoKw, tipologiaTerminale = "parete") {
+  const richiestaBtu = fabbisognoKw * 3412;
+  const potenzaDi = (p) => p.potenzaBtu;
+
+  const perLivello = LIVELLI_GAMMA.map((livello) => {
+    const dellaSerie = CATALOGO_PRODOTTI.filter(
+      (p) => p.tipo === "climatizzatore_split" && p.livello === livello.valore && (!tipologiaTerminale || p.tipologiaTerminale === tipologiaTerminale)
+    );
+    const scelti = selezionaPerCapacita(dellaSerie, richiestaBtu, potenzaDi);
+    // Dentro un livello la taglia giusta è una sola: a parità, la meno cara.
+    scelti.sort((a, b) => a.prezzoIndicativoMin - b.prezzoIndicativoMin);
+    return scelti[0] ? { ...livello, prodotto: scelti[0] } : null;
+  }).filter(Boolean);
+
+  if (perLivello.length === 0) {
+    return { alternative: [], messaggio: "Nessun modello a catalogo copre questo fabbisogno — contattaci per una soluzione su misura" };
+  }
+
+  perLivello.sort((a, b) => a.prodotto.prezzoIndicativoMin - b.prodotto.prezzoIndicativoMin);
+  return { alternative: perLivello, messaggio: null };
+}
+
 export function trovaProdottiConsigliati(fabbisognoKw, tipo = "climatizzatore_split", numeroUnitaRichieste = null, tipologiaTerminale = null) {
   const fabbisognoBtu = fabbisognoKw * 3412;
   const margineMax = 1.25;
@@ -600,33 +652,13 @@ export function trovaProdottiConsigliati(fabbisognoKw, tipo = "climatizzatore_sp
     // macchine a parete, piu economiche, coprirebbero sempre i primi posti
     // e le altre tipologie non comparirebbero mai.
     if (tipologiaTerminale && p.tipologiaTerminale && p.tipologiaTerminale !== tipologiaTerminale) return false;
-    const potenzaProdottoBtu = basatoSuBtu ? p.potenzaBtu : p.potenzaKw * 3412;
-    const potenzaRichiestaBtu = basatoSuBtu ? fabbisognoBtu : fabbisognoKw * 3412;
-    return potenzaProdottoBtu >= potenzaRichiestaBtu;
+    return true;
   });
 
   const potenzaDi = (p) => (basatoSuBtu ? p.potenzaBtu : p.potenzaKw * 3412);
   const richiestaBtu = basatoSuBtu ? fabbisognoBtu : fabbisognoKw * 3412;
 
-  /*
-   * Si preferiscono le macchine entro il margine del 25% sul fabbisogno:
-   * a parità di resa, sovradimensionare costa di più e fa lavorare
-   * l'inverter a carico parziale.
-   *
-   * Quando però nessuna macchina cade in quella finestra si propone la
-   * taglia più piccola disponibile, senza commentare. Il mercato non
-   * scende sotto i 9.000 BTU (2,7 kW circa): per un ambiente che ne
-   * chiede meno, la 09 non è un ripiego ma semplicemente la macchina che
-   * si installa, e rispondere "nessun modello a catalogo" sarebbe falso.
-   */
-  const entroMargine = idonei.filter((p) => potenzaDi(p) <= richiestaBtu * margineMax);
-  const candidati =
-    entroMargine.length > 0
-      ? entroMargine
-      : (() => {
-          const minima = Math.min(...idonei.map(potenzaDi));
-          return idonei.filter((p) => potenzaDi(p) === minima);
-        })();
+  const candidati = selezionaPerCapacita(idonei, richiestaBtu, potenzaDi, margineMax);
 
   candidati.sort((a, b) => {
     const classeDiff = ORDINE_CLASSI_ENERGETICHE.indexOf(a.classeEnergetica) - ORDINE_CLASSI_ENERGETICHE.indexOf(b.classeEnergetica);

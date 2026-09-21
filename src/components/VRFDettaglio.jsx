@@ -34,6 +34,12 @@ export default function VRFDettaglio({ risultatiAmbienti, sistemaCentralizzato, 
         Fattore di contemporaneità e derating sono valori convenzionali indicativi per un pre-dimensionamento
         speditivo: verificare sempre le curve reali del produttore/modello selezionato in fase esecutiva.
       </p>
+      <p className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded p-2">
+        <span className="font-semibold text-slate-700">Due livelli di efficienza per l'unità esterna.</span> La
+        gamma <span className="font-semibold">A++</span> copre tutte le taglie da 14K a 42K e collega da 2 a 5 unità
+        interne. La <span className="font-semibold">A+++</span> esiste solo in 18K e 27K, con 2 o 4 attacchi: consuma
+        meno ma vincola il numero di ambienti serviti, quindi va verificata prima di prometterla al cliente.
+      </p>
       <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
         <Riga label="Unità interne collegate" value={d.numeroUnitaInterne} />
         <Riga label="Totale invernale edificio" value={formattaKw(d.totaleInvernaleKw)} />

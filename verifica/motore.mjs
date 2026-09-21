@@ -27,7 +27,7 @@ import { calcolaBollitore, kwToBtu, btuToKw, TRASMITTANZE_PER_EPOCA, MAGGIORAZIO
 import { PARAMETRI_CALCOLO, parametro, parametroDefault } from "../src/utils/parametriCalcolo.js";
 import { stimaConsumoAnnuoClimatizzazione } from "../src/utils/fotovoltaico.js";
 import { COLONNE_AMBIENTI, CONVENZIONI_TABELLA, intestazioneColonna } from "../src/utils/colonneAmbienti.js";
-import { CATALOGO_PRODOTTI, trovaProdottiConsigliati } from "../src/data/catalogo.js";
+import { CATALOGO_PRODOTTI, trovaProdottiConsigliati, trovaAlternativeDiGamma } from "../src/data/catalogo.js";
 import { MONOSPLIT_AUX, LIGHT_COMMERCIAL_AUX, UNITA_INTERNE_MULTI_AUX, UNITA_ESTERNE_MULTI_AUX, capacitaGarantita, prezzoSistema } from "../src/data/gammaAux.js";
 import { calcolaSuperficieMuriEsterni, sviluppoParetiEsterne, areaFinestra, normalizzaGeometria } from "../src/utils/stime.js";
 import { ORE_DI_CALCOLO, quotaIrraggiamento, temperaturaEsternaOraria, ESCURSIONE_DEFAULT_K } from "../src/utils/profiliOrari.js";
@@ -554,6 +554,27 @@ function ambienteRiferimento(extra = {}) {
   // Sopra la taglia massima il catalogo deve invece dire che non copre.
   const troppoGrande = trovaProdottiConsigliati(40, "climatizzatore_split", null, "parete");
   vero("oltre la gamma il catalogo lo dichiara", troppoGrande.consigliati.length === 0 && Boolean(troppoGrande.messaggio));
+
+  // Le tre alternative di gamma: stessa taglia, tre prezzi.
+  const { alternative } = trovaAlternativeDiGamma(3.3, "parete");
+  uguale("tre alternative di gamma", alternative.length, 3);
+  ugualeTesto("la base è la serie Q", alternative[0].prodotto.serie, "Q");
+  ugualeTesto("l'intermedia è la CU-PRO", alternative[1].prodotto.serie, "CU-PRO");
+  ugualeTesto("la top è la CA-PRO", alternative[2].prodotto.serie, "CA-PRO");
+  vero("ordinate per prezzo crescente", alternative[0].prodotto.prezzoIndicativoMin < alternative[1].prodotto.prezzoIndicativoMin && alternative[1].prodotto.prezzoIndicativoMin < alternative[2].prodotto.prezzoIndicativoMin);
+  vero("stessa taglia commerciale in tutte e tre", new Set(alternative.map((a) => a.prodotto.tagliaCommerciale)).size === 1);
+  // Le famiglie senza livelli non hanno alternative di gamma: una linea sola.
+  uguale("i canalizzabili non hanno livelli di gamma", trovaAlternativeDiGamma(5.0, "canalizzabile").alternative.length, 0);
+
+  // Unità esterne multisplit: due livelli di efficienza con vincoli diversi.
+  const esterne = CATALOGO_PRODOTTI.filter((p) => p.tipo === "vrf" && p.marchio === "AUX");
+  const attacchiStandard = [...new Set(esterne.filter((p) => p.classeEnergetica === "A++").map((p) => p.maxUnitaInterne))].sort();
+  const attacchiAlta = [...new Set(esterne.filter((p) => p.classeEnergetica === "A+++").map((p) => p.maxUnitaInterne))].sort();
+  ugualeTesto("la gamma A++ collega da 2 a 5 unità interne", attacchiStandard.join(","), "2,3,4,5");
+  ugualeTesto("la gamma A+++ collega 2 o 4 unità interne", attacchiAlta.join(","), "2,4");
+  // Chiedendo 5 interne resta solo la A++: la A+++ non arriva a tanto.
+  const perCinque = trovaProdottiConsigliati(12.0, "vrf", 5);
+  vero("con cinque unità interne resta solo la gamma A++", perCinque.consigliati.every((p) => p.classeEnergetica === "A++"), perCinque.messaggio || "");
 
   // Un'unità esterna multisplit non può essere proposta per meno interne di quante ne servono.
   const perQuattro = trovaProdottiConsigliati(7.5, "vrf", 4);

@@ -23,6 +23,8 @@ import {
   UNITA_ESTERNE_MULTI_AUX,
   capacitaGarantita,
   prezzoSistema,
+  livelloDiGamma,
+  LIVELLI_ESTERNA_MULTI,
 } from "./gammaAux.js";
 import { kwToBtu } from "./calculations.js";
 
@@ -45,6 +47,7 @@ function daSistemaCompleto(unita, tipologiaTerminale) {
     tipo: "climatizzatore_split",
     tipologiaTerminale,
     serie: unita.serie,
+    livello: livelloDiGamma(unita.serie),
     // Taglia commerciale in migliaia di BTU/h, come la chiama il listino.
     tagliaCommerciale: unita.taglia,
     potenzaBtu: Math.round(kwToBtu(capacitaKw)),
@@ -79,6 +82,7 @@ function daUnitaEsternaMulti(unita) {
     tipo: "vrf",
     tipologiaTerminale: null,
     serie: "Multisplit",
+    livello: LIVELLI_ESTERNA_MULTI.find((l) => l.classe === unita.classe)?.valore ?? null,
     tagliaCommerciale: null,
     potenzaBtu: null,
     potenzaKw: capacitaKw,
@@ -108,6 +112,7 @@ function daUnitaInternaMulti(unita) {
     tipo: "unita_interna_multi",
     tipologiaTerminale: unita.tipologia,
     serie: unita.serie,
+    livello: livelloDiGamma(unita.serie),
     tagliaCommerciale: unita.taglia,
     potenzaBtu: Math.round(kwToBtu(capacitaKw)),
     potenzaKw: capacitaKw,

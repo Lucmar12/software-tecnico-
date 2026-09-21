@@ -23,6 +23,40 @@ export const MARCHIO_AUX = "AUX";
 export const LISTINO_AUX = "Listino Italia 2026, IVA esclusa";
 
 /**
+ * Livelli di gamma degli split, mono e multi. Sono tre alternative sullo
+ * stesso fabbisogno: cambia l'efficienza e il prezzo, non la taglia.
+ * Vanno presentate insieme, perché la scelta fra le tre è del cliente e
+ * non del calcolo.
+ */
+export const LIVELLI_GAMMA = [
+  { valore: "base", etichetta: "Base", serie: "Q", descrizione: "Serie Q: la soluzione più economica, classe A++." },
+  { valore: "intermedio", etichetta: "Intermedia", serie: "CU-PRO", descrizione: "Serie CU-PRO: classe A+++ in raffrescamento, unità esterna compatta." },
+  { valore: "top", etichetta: "Top", serie: "CA-PRO", descrizione: "Serie CA-PRO: il massimo di gamma, con la migliore resa in riscaldamento." },
+];
+
+/** Livelli di efficienza delle unità esterne multisplit. */
+export const LIVELLI_ESTERNA_MULTI = [
+  {
+    valore: "standard",
+    classe: "A++",
+    etichetta: "Standard A++",
+    descrizione: "Gamma completa da 14K a 42K, da 2 a 5 unità interne collegabili.",
+  },
+  {
+    valore: "alta-efficienza",
+    classe: "A+++",
+    etichetta: "Alta efficienza A+++",
+    descrizione: "Solo taglie 18K e 27K, con 2 o 4 unità interne collegabili: la scelta vincola il numero di ambienti serviti.",
+  },
+];
+
+/** Livello di gamma a partire dalla serie del prodotto. */
+export function livelloDiGamma(serie) {
+  const nome = String(serie).replace(/^Multi /, "");
+  return LIVELLI_GAMMA.find((l) => l.serie === nome)?.valore ?? null;
+}
+
+/**
  * Tipologie di terminale: è la prima scelta che il cliente deve fare,
  * prima ancora della taglia. Cambia l'installazione, l'estetica e il
  * prezzo, non il fabbisogno.
