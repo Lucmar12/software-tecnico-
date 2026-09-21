@@ -5,6 +5,7 @@ import { OPZIONI_PARETI_ESTERNE, TIPI_FINESTRA } from "../utils/stime.js";
 import { validaAmbiente } from "../utils/validazione.js";
 import { calcolaAmbienteConOverride, isAmbienteNonStandard } from "../utils/overrides.js";
 import { profiloEstivoEdificio } from "../utils/profiliOrari.js";
+import { COLONNE_AMBIENTI, CONVENZIONI_TABELLA, intestazioneColonna } from "../utils/colonneAmbienti.js";
 import { ETICHETTE_EPOCA, ETICHETTE_TIPO_LOCALE } from "../data/calculations.js";
 
 /** Etichette brevi per le celle: il testo completo resta nel tooltip e nei dettagli. */
@@ -51,6 +52,15 @@ const inputBase =
  * peggio di un valore assente, perché si legge sbagliato. Ogni colonna
  * garantisce quindi lo spazio per il suo valore più lungo.
  */
+/** Larghezza della colonna in tabella, per chiave di colonna. */
+const LARGHEZZA_COLONNA = {
+  lunghezza: "w-[70px]",
+  larghezza: "w-[70px]",
+  altezza: "w-[62px]",
+  superficie: "w-[62px]",
+  epoca: "w-[118px]",
+};
+
 const LARGHEZZA = {
   nome: "min-w-[130px]",
   tipo: "min-w-[112px]",
@@ -85,6 +95,7 @@ function classeInput(errore, extra = "") {
  */
 export default function AmbientiTabella({ ambienti, onChange, comune }) {
   const [dettagliAperti, setDettagliAperti] = useState([]);
+  const [legendaAperta, setLegendaAperta] = useState(false);
 
   // Sui monitor le barre di scorrimento compaiono solo durante lo scorrimento:
   // senza un avviso esplicito le colonne fuori schermo passano inosservate.
@@ -136,23 +147,33 @@ export default function AmbientiTabella({ ambienti, onChange, comune }) {
         <table className="w-full text-sm border-collapse">
           <thead>
             <tr className="text-[11px] text-slate-500 text-left border-b border-slate-200 bg-slate-50">
-              <th className={`${cella} pl-3 z-10 bg-slate-50 ${fissaSinistra}`}>Ambiente</th>
-              <th className={`${cella} w-[105px]`}>Tipo</th>
-              <th className={`${cella} w-[70px]`} title="Il lato più lungo della stanza">Lungh. [m]</th>
-              <th className={`${cella} w-[70px]`}>Largh. [m]</th>
-              <th className={`${cella} w-[62px]`}>Alt. [m]</th>
-              <th className={`${cella} w-[62px] text-right`}>Sup. [m²]</th>
-              <th className={`${cella} w-[120px]`}>Lati esterni</th>
-              <th className={`${cella} w-[52px]`} title="Numero di finestre e portefinestre">Fin. [n]</th>
-              <th className={`${cella} w-[140px]`}>Serramento</th>
-              <th className={`${cella} w-[78px]`}>Espos.</th>
-              <th className={`${cella} w-[98px]`}>Piano</th>
-              <th className={`${cella} w-[118px]`}>Costruito</th>
-              <th className={`${cella} w-[58px]`} title="Occupanti di progetto">Occ. [n]</th>
+              {COLONNE_AMBIENTI.map((c, indice) => {
+                // La prima colonna è fissa a sinistra, le ultime due sono
+                // raccolte nel blocco fisso a destra insieme ai pulsanti.
+                if (c.chiave === "invernale" || c.chiave === "estivo") return null;
+                const primo = indice === 0;
+                return (
+                  <th
+                    key={c.chiave}
+                    title={c.significato}
+                    className={`${cella} ${LARGHEZZA_COLONNA[c.chiave] || ""} ${
+                      c.chiave === "superficie" ? "text-right" : ""
+                    } ${primo ? `pl-3 z-10 bg-slate-50 ${fissaSinistra}` : ""}`}
+                  >
+                    {intestazioneColonna(c)}
+                  </th>
+                );
+              })}
               <th className={`${cella} pr-3 z-10 bg-slate-50 ${fissaDestra}`}>
                 <div className="flex items-end gap-1">
-                  <span className="w-14 text-right text-sky-700">Inv. [kW]</span>
-                  <span className="w-14 text-right text-amber-700">Est. [kW]</span>
+                  <span className="w-14 text-right text-sky-700 leading-tight" title={COLONNE_AMBIENTI.find((c) => c.chiave === "invernale").significato}>
+                    Inverno
+                    <span className="block font-normal">[kW]</span>
+                  </span>
+                  <span className="w-14 text-right text-amber-700 leading-tight" title={COLONNE_AMBIENTI.find((c) => c.chiave === "estivo").significato}>
+                    Estate
+                    <span className="block font-normal">[kW]</span>
+                  </span>
                   <span className="w-[5.5rem]" />
                 </div>
               </th>
@@ -328,10 +349,70 @@ export default function AmbientiTabella({ ambienti, onChange, comune }) {
         >
           + Aggiungi ambiente
         </button>
-        <span className="text-[11px] text-slate-400">
-          {haColonneNascoste && <span className="text-brand-700 font-medium">Scorri la tabella in orizzontale per vedere tutte le colonne ⟷ · </span>}
-          Celle gialle: valore convenzionale da confermare · <span className="text-brand-600">●</span> ambiente con parametri modificati
-        </span>
+        <div className="text-[11px] text-slate-400 flex items-center gap-2 flex-wrap justify-end">
+          {haColonneNascoste && <span className="text-brand-700 font-medium">Scorri la tabella in orizzontale per vedere tutte le colonne ⟷</span>}
+          <button
+            onClick={() => setLegendaAperta((v) => !v)}
+            aria-expanded={legendaAperta}
+            className="text-brand-700 underline font-medium"
+          >
+            {legendaAperta ? "Nascondi la legenda" : "Cosa significano le colonne?"}
+          </button>
+        </div>
+      </div>
+
+      {legendaAperta && <Legenda />}
+    </div>
+  );
+}
+
+const COLORE_ORIGINE = {
+  inserito: "bg-white border-slate-300 text-slate-600",
+  calcolato: "bg-slate-100 border-slate-300 text-slate-600",
+  convenzionale: "bg-amber-50 border-amber-300 text-amber-800",
+};
+
+const SPIEGAZIONE_ORIGINE = {
+  inserito: "lo inserisci tu",
+  calcolato: "ricavato dai tuoi dati",
+  convenzionale: "assunto, da confermare",
+};
+
+/**
+ * Legenda di tutte le colonne, generata dalla stessa definizione che
+ * produce le intestazioni: non può descrivere una tabella diversa da
+ * quella che l'utente ha davanti.
+ */
+function Legenda() {
+  return (
+    <div className="border-t border-slate-200 px-3 py-4 space-y-4 text-sm bg-slate-50/60 rounded-b-xl">
+      <div>
+        <h4 className="font-semibold text-slate-800">Le colonne della tabella</h4>
+        <p className="text-[11px] text-slate-500 mt-0.5">
+          L'etichetta a destra dice da dove viene il numero: se lo scrivi tu, se lo ricava il software dai tuoi dati,
+          o se è un valore assunto in mancanza di meglio.
+        </p>
+      </div>
+
+      <dl className="space-y-2">
+        {COLONNE_AMBIENTI.map((c) => (
+          <div key={c.chiave} className="flex flex-col sm:flex-row sm:items-baseline gap-x-3 gap-y-0.5 border-b border-slate-200/70 pb-2 last:border-0">
+            <dt className="font-semibold text-slate-700 sm:w-40 shrink-0">{intestazioneColonna(c)}</dt>
+            <dd className="text-slate-600 flex-1 leading-snug">{c.significato}</dd>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium shrink-0 self-start ${COLORE_ORIGINE[c.origine]}`}>
+              {SPIEGAZIONE_ORIGINE[c.origine]}
+            </span>
+          </div>
+        ))}
+      </dl>
+
+      <div>
+        <h4 className="font-semibold text-slate-800">Colori e segni</h4>
+        <ul className="mt-1 space-y-1 text-slate-600 text-[13px] list-disc list-inside">
+          {CONVENZIONI_TABELLA.map((v) => (
+            <li key={v.segno}>{v.testo}</li>
+          ))}
+        </ul>
       </div>
     </div>
   );

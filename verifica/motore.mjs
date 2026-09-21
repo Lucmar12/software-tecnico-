@@ -26,6 +26,7 @@ import { calcolaFattoreDeratingBassaTemperatura } from "../src/utils/deratingPom
 import { calcolaBollitore, kwToBtu, btuToKw, TRASMITTANZE_PER_EPOCA, MAGGIORAZIONE_PONTI_TERMICI_PER_EPOCA, RICAMBI_ARIA_PER_TIPO_LOCALE, ZONE_CLIMATICHE, TAGLIE_COMMERCIALI_BTU, TAGLIE_BOLLITORE_STANDARD, EFFICIENZA_PER_CLASSE, FATTORE_ESPOSIZIONE } from "../src/data/calculations.js";
 import { PARAMETRI_CALCOLO, parametro, parametroDefault } from "../src/utils/parametriCalcolo.js";
 import { stimaConsumoAnnuoClimatizzazione } from "../src/utils/fotovoltaico.js";
+import { COLONNE_AMBIENTI, CONVENZIONI_TABELLA, intestazioneColonna } from "../src/utils/colonneAmbienti.js";
 import { calcolaSuperficieMuriEsterni, sviluppoParetiEsterne, areaFinestra, normalizzaGeometria } from "../src/utils/stime.js";
 import { ORE_DI_CALCOLO, quotaIrraggiamento, temperaturaEsternaOraria, ESCURSIONE_DEFAULT_K } from "../src/utils/profiliOrari.js";
 
@@ -37,6 +38,12 @@ function uguale(descrizione, ottenuto, atteso, tolleranza = 1e-3) {
   const ok = Math.abs(ottenuto - atteso) <= tolleranza;
   if (ok) passati++;
   else falliti.push({ descrizione, ottenuto, atteso, tolleranza });
+}
+
+/** Confronto fra stringhe: uguale() lavora sui numeri e su un testo darebbe NaN. */
+function ugualeTesto(descrizione, ottenuto, atteso) {
+  if (ottenuto === atteso) passati++;
+  else falliti.push({ descrizione, ottenuto: `"${ottenuto}"`, atteso: `"${atteso}"`, tolleranza: 0 });
 }
 
 function vero(descrizione, condizione, dettaglio = "") {
@@ -465,6 +472,28 @@ function ambienteRiferimento(extra = {}) {
   // Una costante fisica "sovrascritta" per errore non deve avere effetto.
   const tentativo = calcolaAmbienteConOverride({ ...base, parametri: { capacitaTermicaAria: 99 } }, COMUNE);
   uguale("la fisica non si piega da un campo di input", tentativo.scomposizioneInvernale.ventilazioneKw, r0.scomposizioneInvernale.ventilazioneKw, 1e-9);
+}
+
+// ---------------------------------------------------------------------
+// LEGENDA DELLA TABELLA — deve descrivere la tabella vera
+// ---------------------------------------------------------------------
+{
+  const origini = ["inserito", "calcolato", "convenzionale"];
+  for (const c of COLONNE_AMBIENTI) {
+    vero(`la colonna "${c.chiave}" ha un'intestazione`, Boolean(c.intestazione));
+    vero(`la colonna "${c.chiave}" è spiegata in legenda`, typeof c.significato === "string" && c.significato.length > 20);
+    vero(`la colonna "${c.chiave}" dichiara da dove viene il dato`, origini.includes(c.origine), String(c.origine));
+  }
+  // Nessuna chiave duplicata: due colonne con lo stesso nome renderebbero
+  // ambigua la legenda.
+  const chiavi = COLONNE_AMBIENTI.map((c) => c.chiave);
+  vero("nessuna colonna duplicata", new Set(chiavi).size === chiavi.length);
+  // I due risultati calcolati devono esserci: sono il motivo della tabella.
+  vero("la legenda copre i carichi invernale ed estivo", chiavi.includes("invernale") && chiavi.includes("estivo"));
+  // Le unità, dove servono, sono nell'intestazione e non nel testo.
+  ugualeTesto("intestazione con unità di misura", intestazioneColonna({ intestazione: "Alt.", unita: "m" }), "Alt. [m]");
+  ugualeTesto("intestazione senza unità", intestazioneColonna({ intestazione: "Tipo" }), "Tipo");
+  vero("le convenzioni grafiche sono spiegate", CONVENZIONI_TABELLA.length >= 3 && CONVENZIONI_TABELLA.every((v) => v.testo.length > 20));
 }
 
 // ---------------------------------------------------------------------
