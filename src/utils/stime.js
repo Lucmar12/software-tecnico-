@@ -53,11 +53,11 @@ export const CAMPI_CONVENZIONALI = ["numeroOccupanti"];
  * esposto è determinato.
  */
 export const OPZIONI_PARETI_ESTERNE = [
-  { value: "latoCorto", label: "Un lato corto", sviluppo: (L, W) => W },
-  { value: "latoLungo", label: "Un lato lungo", sviluppo: (L, W) => L },
-  { value: "angolo", label: "Due lati — ambiente d'angolo", sviluppo: (L, W) => L + W },
-  { value: "tre", label: "Tre lati — ambiente di testata", sviluppo: (L, W) => L + 2 * W },
-  { value: "tutti", label: "Tutti e quattro i lati", sviluppo: (L, W) => 2 * (L + W) },
+  { value: "latoCorto", label: "Un lato corto", breve: "Lato corto", sviluppo: (L, W) => W },
+  { value: "latoLungo", label: "Un lato lungo", breve: "Lato lungo", sviluppo: (L, W) => L },
+  { value: "angolo", label: "Due lati — ambiente d'angolo", breve: "Angolo (2)", sviluppo: (L, W) => L + W },
+  { value: "tre", label: "Tre lati — ambiente di testata", breve: "Testata (3)", sviluppo: (L, W) => L + 2 * W },
+  { value: "tutti", label: "Tutti e quattro i lati", breve: "4 lati", sviluppo: (L, W) => 2 * (L + W) },
 ];
 
 const SVILUPPO_PER_CONFIGURAZIONE = Object.fromEntries(OPZIONI_PARETI_ESTERNE.map((o) => [o.value, o.sviluppo]));
@@ -94,7 +94,12 @@ export function normalizzaGeometria(ambiente) {
   if (typeof a.paretiEsterne === "number") a.paretiEsterne = CONFIGURAZIONE_DA_NUMERO[a.paretiEsterne] || CONFIGURAZIONE_PARETI_DEFAULT;
   if (!SVILUPPO_PER_CONFIGURAZIONE[a.paretiEsterne]) a.paretiEsterne = CONFIGURAZIONE_PARETI_DEFAULT;
 
-  const haDimensioni = Number(a.lunghezzaM) > 0 && Number(a.larghezzaM) > 0;
+  // Progetto storico = lati ASSENTI, non lati a zero. Uno zero è quasi
+  // sempre un campo appena svuotato da chi sta per riscriverlo: trattarlo
+  // come dato mancante sostituirebbe in silenzio entrambi i lati con √A
+  // sotto le dita dell'utente. Un lato nullo resta nullo e la validazione
+  // lo segnala.
+  const haDimensioni = a.lunghezzaM != null && a.larghezzaM != null;
   if (!haDimensioni) {
     const superficie = Number(a.superficiePavimento);
     const lato = superficie > 0 ? Math.round(Math.sqrt(superficie) * 100) / 100 : 0;
@@ -134,12 +139,12 @@ export function sviluppoParetiEsterne({ lunghezzaM, larghezzaM, paretiEsterne })
  * tolleranza di posa.
  */
 export const TIPI_FINESTRA = [
-  { value: "piccola", label: "Finestrino / bagno (60 × 80 cm)", larghezza: 0.6, altezza: 0.8 },
-  { value: "unaAnta", label: "Finestra a una anta (80 × 140 cm)", larghezza: 0.8, altezza: 1.4 },
-  { value: "dueAnte", label: "Finestra a due ante (120 × 140 cm)", larghezza: 1.2, altezza: 1.4 },
-  { value: "portafinestra", label: "Portafinestra a una anta (80 × 220 cm)", larghezza: 0.8, altezza: 2.2 },
-  { value: "portafinestraDue", label: "Portafinestra a due ante (140 × 220 cm)", larghezza: 1.4, altezza: 2.2 },
-  { value: "vetrata", label: "Vetrata / scorrevole (240 × 220 cm)", larghezza: 2.4, altezza: 2.2 },
+  { value: "piccola", label: "Finestrino / bagno (60 × 80 cm)", breve: "Finestrino 60×80", larghezza: 0.6, altezza: 0.8 },
+  { value: "unaAnta", label: "Finestra a una anta (80 × 140 cm)", breve: "1 anta 80×140", larghezza: 0.8, altezza: 1.4 },
+  { value: "dueAnte", label: "Finestra a due ante (120 × 140 cm)", breve: "2 ante 120×140", larghezza: 1.2, altezza: 1.4 },
+  { value: "portafinestra", label: "Portafinestra a una anta (80 × 220 cm)", breve: "Portaf. 80×220", larghezza: 0.8, altezza: 2.2 },
+  { value: "portafinestraDue", label: "Portafinestra a due ante (140 × 220 cm)", breve: "Portaf. 140×220", larghezza: 1.4, altezza: 2.2 },
+  { value: "vetrata", label: "Vetrata / scorrevole (240 × 220 cm)", breve: "Vetrata 240×220", larghezza: 2.4, altezza: 2.2 },
 ];
 
 const AREA_PER_TIPO_FINESTRA = Object.fromEntries(

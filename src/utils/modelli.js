@@ -67,6 +67,33 @@ export function nuovoAmbiente(overrides = {}) {
   });
 }
 
+/**
+ * Aggiorna un campo dell'ambiente. Se il campo era ricavato in automatico,
+ * l'inserimento manuale lo toglie dal ricalcolo; le derivazioni ancora
+ * attive vengono comunque ricalcolate, perché il campo modificato può
+ * esserne una sorgente (lati, altezza, lati esposti, serramenti, tipo
+ * di locale). Unico punto di modifica, condiviso da tabella e dettagli.
+ */
+export function aggiornaCampoAmbiente(ambiente, campo, valore) {
+  const campiStimati = (ambiente.campiStimati || []).filter((c) => c !== campo);
+  return applicaStime({ ...ambiente, [campo]: valore, campiStimati });
+}
+
+/** Rimette un campo sotto il calcolo automatico. */
+export function ripristinaCalcoloAutomatico(ambiente, campo) {
+  const campiStimati = [...new Set([...(ambiente.campiStimati || []), campo])];
+  return applicaStime({ ...ambiente, campiStimati });
+}
+
+/** Posizione in edificio come valore unico ("terra" | "intermedio" | "ultimo"). */
+export function pianoAmbiente(ambiente) {
+  return ambiente.ultimoPiano ? "ultimo" : ambiente.pianoTerra ? "terra" : "intermedio";
+}
+
+export function impostaPianoAmbiente(ambiente, piano) {
+  return { ...ambiente, ultimoPiano: piano === "ultimo", pianoTerra: piano === "terra" };
+}
+
 export function nuovoScenario(nome = "Stato di fatto", ambienti = null) {
   return {
     id: generaId(),

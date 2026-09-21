@@ -3,7 +3,7 @@ import Header from "./components/Header.jsx";
 import TipoImpiantoSelector from "./components/TipoImpiantoSelector.jsx";
 import ComuneSelector from "./components/ComuneSelector.jsx";
 import ScenariTabs from "./components/ScenariTabs.jsx";
-import AmbientiList from "./components/AmbientiList.jsx";
+import AmbientiTabella from "./components/AmbientiTabella.jsx";
 import ACSForm from "./components/ACSForm.jsx";
 import TrattamentoAcqueForm from "./components/TrattamentoAcqueForm.jsx";
 import PompeIdraulicheForm from "./components/PompeIdraulicheForm.jsx";
@@ -21,6 +21,7 @@ import { ambienteValido } from "./utils/validazione.js";
 import { calcolaEdificioConOverride } from "./utils/overrides.js";
 import { FATTORE_CONTEMPORANEITA_DEFAULT } from "./utils/vrf.js";
 import { caricaBozza, salvaBozza } from "./utils/persistenza.js";
+import { applicaStime } from "./utils/stime.js";
 
 const STATO_INIZIALE = {
   tipiImpianto: { climatizzazione: true, acs: true, trattamentoAcque: false, pompeIdrauliche: false },
@@ -68,7 +69,14 @@ function fondiConDefault(statoCaricato) {
       sollevamento: { ...STATO_INIZIALE.pompeIdrauliche.sollevamento, ...(statoCaricato.pompeIdrauliche?.sollevamento || {}) },
       circolazione: { ...STATO_INIZIALE.pompeIdrauliche.circolazione, ...(statoCaricato.pompeIdrauliche?.circolazione || {}) },
     },
-    scenari: statoCaricato.scenari?.length ? statoCaricato.scenari : STATO_INIZIALE.scenari,
+    // Ogni ambiente caricato passa dalla normalizzazione: i progetti salvati
+    // prima di lunghezza, larghezza e serramenti hanno solo la superficie, e
+    // senza questo passaggio arriverebbero in tabella con celle vuote e
+    // segnalate come errore.
+    scenari: (statoCaricato.scenari?.length ? statoCaricato.scenari : STATO_INIZIALE.scenari).map((sc) => ({
+      ...sc,
+      ambienti: (sc.ambienti || []).map(applicaStime),
+    })),
   };
 
   // Gli id di scenario ereditati dai default non appartengono agli scenari
@@ -220,7 +228,7 @@ export default function App() {
     <div className="min-h-screen">
       <Header />
 
-      <main className="max-w-6xl mx-auto px-4 py-6 space-y-6">
+      <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
         <div className="flex flex-wrap gap-2 justify-end no-print">
           <ProgettiPanel statoCorrente={statoCompleto} progettoAttivoId={progettoAttivoId} onCarica={caricaProgetto} onSalvatoConSuccesso={setProgettoAttivoId} />
           <StoricoRichieste />
@@ -276,8 +284,9 @@ export default function App() {
         {tipiImpianto.climatizzazione && (
           <section id="sezione-ambienti" className="space-y-3 no-print">
             <StepHeader numero={nAmbienti} titolo={`Ambienti — ${scenarioAttivo.nome}`} />
-            <AmbientiList
+            <AmbientiTabella
               ambienti={scenarioAttivo.ambienti}
+              comune={comune}
               onChange={(ambienti) => aggiornaAmbientiScenario(scenarioAttivo.id, ambienti)}
             />
             <SistemaCentralizzatoPanel

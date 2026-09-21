@@ -114,6 +114,13 @@ function ambienteRiferimento(extra = {}) {
   uguale("progetto storico: lato dedotto √16 = 4,00 m", vecchio.lunghezzaM, 4, 0.01);
   vero("progetto storico segnalato come dedotto", vecchio.dimensioniDedotte === true);
   vero("configurazione pareti convertita da numero a testo", vecchio.paretiEsterne === "latoLungo");
+
+  // Svuotare un lato per riscriverlo NON deve far scattare la deduzione da
+  // superficie: 5 × 4 con la lunghezza azzerata resta 0 × 4, non 4,47 × 4,47.
+  const inModifica = normalizzaGeometria({ ...ambienteRiferimento(), lunghezzaM: 0 });
+  uguale("lato azzerato durante la digitazione resta a zero", inModifica.lunghezzaM, 0, 1e-9);
+  uguale("l'altro lato non viene toccato", inModifica.larghezzaM, 4, 1e-9);
+  vero("un lato a zero non passa la validazione", inModifica.superficiePavimento === 0);
 }
 
 // ---------------------------------------------------------------------
