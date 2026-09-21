@@ -23,6 +23,7 @@ export default function AlternativeDiGamma({ fabbisognoKw, tipologiaTerminale = 
         <h3 className="font-semibold text-slate-800">Tre alternative per lo stesso fabbisogno</h3>
         <p className="text-xs text-slate-400 mt-0.5">
           Stessa taglia, calcolata su {formattaKw(fabbisognoKw)}: cambiano efficienza e prezzo, non la capacità.
+          Le due classi indicate sono raffrescamento (SEER) e riscaldamento (SCOP).
         </p>
       </div>
 
@@ -36,8 +37,9 @@ export default function AlternativeDiGamma({ fabbisognoKw, tipologiaTerminale = 
           >
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-bold uppercase tracking-wide text-slate-500">{etichetta}</span>
-              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600" title="Classe in raffrescamento (SEER) e in riscaldamento (SCOP)">
                 {prodotto.classeEnergetica}
+                {prodotto.classeScop ? ` · ${prodotto.classeScop}` : ""}
               </span>
             </div>
 
