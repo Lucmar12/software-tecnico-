@@ -35,16 +35,11 @@ export default function CatalogoTabella({ fabbisognoKw, tipo = "climatizzatore_s
           </tr>
         </thead>
         <tbody>
-          {consigliati.map((p, i) => (
+          {consigliati.map((p) => (
             <tr key={`${p.marchio}-${p.modello}`} className="border-t border-slate-100">
               <td className="px-3 py-2">
                 <div className="font-medium text-slate-800">
                   {p.marchio} {p.modello}
-                  {i === 0 && (
-                    <span className="ml-2 text-[10px] bg-brand-100 text-brand-700 px-1.5 py-0.5 rounded font-semibold">
-                      Consigliato
-                    </span>
-                  )}
                 </div>
               </td>
               <td className="text-right px-3 py-2">

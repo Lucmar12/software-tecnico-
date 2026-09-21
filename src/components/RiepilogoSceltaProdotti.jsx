@@ -2,10 +2,14 @@ import React from "react";
 import { formattaEuro, formattaKw } from "../utils/export.js";
 
 /**
- * Riepilogo "Prodotto consigliato": una card per ciascuna categoria
- * dimensionata, con il SOLO prodotto in cima alla classifica (non un
- * confronto tra alternative) — lo scopo è portare chi legge dritto alla
- * scelta di un prodotto preciso, non offrire un'ulteriore comparazione.
+ * Riepilogo dei prodotti idonei, una voce per ciascuna categoria
+ * dimensionata. Dove la gamma ha più livelli sono mostrati tutti, alla
+ * pari; dove c'è una macchina sola, quella.
+ *
+ * Nessun prodotto è marcato come "consigliato": scegliere per il cliente
+ * significherebbe decidere al posto suo su budget e priorità, che il
+ * software non conosce. Il suo compito è dire quali macchine coprono il
+ * fabbisogno e quanto costano.
  * Il dettaglio di calcolo e le alternative restano disponibili più sotto,
  * per chi vuole approfondire. Mostrato subito dopo l'intestazione, prima
  * di ogni dettaglio tecnico.
@@ -38,8 +42,7 @@ export default function RiepilogoSceltaProdotti({ voci, nomeScenario = null }) {
         )}
         <p className="text-xs text-slate-400 mt-0.5">
           Prodotti a catalogo idonei al fabbisogno calcolato, a prezzo di listino IVA esclusa. Dove la gamma prevede
-          più livelli sono proposti tutti: la scelta fra base, intermedia e top è tua, la consigliata è quella con la
-          classe energetica migliore.
+          più livelli sono proposti tutti, alla pari: la scelta fra base, intermedia e top è tua.
         </p>
       </div>
       {climaConGamma && <BloccoGamma voce={climaConGamma} />}
@@ -56,10 +59,11 @@ export default function RiepilogoSceltaProdotti({ voci, nomeScenario = null }) {
 }
 
 /**
- * Le tre alternative di gamma per la climatizzazione. La macchina in cima
- * all'ordine di merito è evidenziata come consigliata, ma le altre due
- * restano sotto gli occhi: la scelta fra base, intermedia e top è del
- * cliente, e presentarne una sola gliela toglierebbe senza dirglielo.
+ * Le tre alternative di gamma per la climatizzazione, presentate alla
+ * pari. Nessuna è marcata come consigliata: sono tre offerte valide sullo
+ * stesso fabbisogno e la scelta fra base, intermedia e top dipende dal
+ * budget e da quanto conta il riscaldamento, cose che il software non sa.
+ * Indicarne una sposterebbe la decisione dal cliente al calcolo.
  */
 function BloccoGamma({ voce }) {
   return (
@@ -72,14 +76,8 @@ function BloccoGamma({ voce }) {
 
       <div className="grid sm:grid-cols-3 gap-3">
         {voce.alternativeGamma.map(({ valore, etichetta, descrizione, prodotto }) => {
-          const consigliato = voce.prodotto && prodotto.modello === voce.prodotto.modello;
           return (
-            <div
-              key={valore}
-              className={`rounded-lg border-2 p-3 flex flex-col gap-1 ${
-                consigliato ? "border-brand-500 bg-white" : "border-slate-200 bg-white/70"
-              }`}
-            >
+            <div key={valore} className="rounded-lg border-2 border-slate-200 bg-white p-3 flex flex-col gap-1">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{etichetta}</span>
                 <span
@@ -90,8 +88,6 @@ function BloccoGamma({ voce }) {
                   {prodotto.classeScop ? ` · ${prodotto.classeScop}` : ""}
                 </span>
               </div>
-
-              {consigliato && <div className="text-[11px] font-semibold text-brand-600">✓ Scelta consigliata</div>}
 
               <div className="text-sm font-bold text-slate-800 leading-tight">
                 {prodotto.marchio} {prodotto.modello}
@@ -116,7 +112,6 @@ function CardScelta({ icona, titolo, prodotto, specifica, messaggio }) {
       </div>
       {prodotto ? (
         <>
-          <div className="text-[11px] font-semibold text-brand-600">✓ Scelta consigliata</div>
           <div className="text-sm font-bold text-slate-800 leading-tight">
             {prodotto.marchio} {prodotto.modello}
           </div>
