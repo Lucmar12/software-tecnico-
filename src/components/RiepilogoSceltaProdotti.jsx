@@ -43,7 +43,7 @@ export default function RiepilogoSceltaProdotti({ voci, nomeScenario = null }) {
   );
 }
 
-function CardScelta({ icona, titolo, prodotto, specifica, messaggio, avviso }) {
+function CardScelta({ icona, titolo, prodotto, specifica, messaggio }) {
   return (
     <div className="rounded-xl border-2 border-brand-400 bg-brand-50/40 p-3.5 flex flex-col gap-1.5">
       <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-brand-700">
@@ -62,7 +62,6 @@ function CardScelta({ icona, titolo, prodotto, specifica, messaggio, avviso }) {
               ? formattaEuro(prodotto.prezzoIndicativoMin)
               : `${formattaEuro(prodotto.prezzoIndicativoMin)}–${formattaEuro(prodotto.prezzoIndicativoMax)}`}
           </div>
-          {avviso && <div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded p-1.5 mt-1 leading-tight">{avviso}</div>}
         </>
       ) : (
         <p className="text-xs text-slate-500">{messaggio || "Nessun prodotto a catalogo copre questo fabbisogno — contattaci per una soluzione su misura"}</p>

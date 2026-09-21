@@ -610,21 +610,23 @@ export function trovaProdottiConsigliati(fabbisognoKw, tipo = "climatizzatore_sp
 
   /*
    * Si preferiscono le macchine entro il margine del 25% sul fabbisogno:
-   * sovradimensionare costa di più e fa lavorare l'inverter a carico
-   * parziale. Ma un catalogo reale parte da una taglia minima — la più
-   * piccola AUX rende 2,7 kW — e per un ambiente piccolo NESSUNA macchina
-   * cade in quella finestra. Rispondere "nessun modello" sarebbe falso:
-   * la macchina esiste, è solo la più piccola disponibile. Si propone
-   * quella, dichiarando il sovradimensionamento.
+   * a parità di resa, sovradimensionare costa di più e fa lavorare
+   * l'inverter a carico parziale.
+   *
+   * Quando però nessuna macchina cade in quella finestra si propone la
+   * taglia più piccola disponibile, senza commentare. Il mercato non
+   * scende sotto i 9.000 BTU (2,7 kW circa): per un ambiente che ne
+   * chiede meno, la 09 non è un ripiego ma semplicemente la macchina che
+   * si installa, e rispondere "nessun modello a catalogo" sarebbe falso.
    */
   const entroMargine = idonei.filter((p) => potenzaDi(p) <= richiestaBtu * margineMax);
-  const soprataglia = entroMargine.length === 0 && idonei.length > 0;
-  const candidati = soprataglia
-    ? (() => {
-        const minima = Math.min(...idonei.map(potenzaDi));
-        return idonei.filter((p) => potenzaDi(p) === minima);
-      })()
-    : entroMargine;
+  const candidati =
+    entroMargine.length > 0
+      ? entroMargine
+      : (() => {
+          const minima = Math.min(...idonei.map(potenzaDi));
+          return idonei.filter((p) => potenzaDi(p) === minima);
+        })();
 
   candidati.sort((a, b) => {
     const classeDiff = ORDINE_CLASSI_ENERGETICHE.indexOf(a.classeEnergetica) - ORDINE_CLASSI_ENERGETICHE.indexOf(b.classeEnergetica);
@@ -642,18 +644,7 @@ export function trovaProdottiConsigliati(fabbisognoKw, tipo = "climatizzatore_sp
     };
   }
 
-  if (soprataglia) {
-    const potenzaMinimaKw = basatoSuBtu ? consigliati[0].potenzaBtu / 3412 : consigliati[0].potenzaKw;
-    return {
-      consigliati,
-      messaggio: null,
-      avviso: `Il fabbisogno calcolato (${fabbisognoKw.toFixed(2)} kW) è inferiore alla taglia più piccola a catalogo (${potenzaMinimaKw.toFixed(
-        2
-      )} kW): la macchina proposta è la minima disponibile e risulta sovradimensionata. Con le macchine inverter è una condizione accettabile, ma valuta se accorpare più ambienti su un unico impianto.`,
-    };
-  }
-
-  return { consigliati, messaggio: null, avviso: null };
+  return { consigliati, messaggio: null };
 }
 
 /** Individua i pannelli solari termici a catalogo idonei a fornire una data capacità di accumulo integrativa [litri], stessa logica di margine +25% max. */

@@ -544,6 +544,17 @@ function ambienteRiferimento(extra = {}) {
   const senzaFiltro = trovaProdottiConsigliati(5.0, "climatizzatore_split");
   vero("senza scelta di tipologia si vede tutta la gamma", senzaFiltro.consigliati.length > 0);
 
+  // Sotto i 9.000 BTU non c'è mercato: per un ambiente che chiede meno
+  // della taglia minima si propone comunque la più piccola a catalogo,
+  // senza scartarla per eccesso di potenza.
+  const ambientePiccolo = trovaProdottiConsigliati(1.2, "climatizzatore_split", null, "parete");
+  vero("un fabbisogno sotto la taglia minima riceve comunque una proposta", ambientePiccolo.consigliati.length > 0, ambientePiccolo.messaggio || "");
+  vero("la proposta è la taglia più piccola del listino", ambientePiccolo.consigliati.every((p) => p.tagliaCommerciale === 9));
+  vero("nessun commento sul sovradimensionamento", ambientePiccolo.avviso == null);
+  // Sopra la taglia massima il catalogo deve invece dire che non copre.
+  const troppoGrande = trovaProdottiConsigliati(40, "climatizzatore_split", null, "parete");
+  vero("oltre la gamma il catalogo lo dichiara", troppoGrande.consigliati.length === 0 && Boolean(troppoGrande.messaggio));
+
   // Un'unità esterna multisplit non può essere proposta per meno interne di quante ne servono.
   const perQuattro = trovaProdottiConsigliati(7.5, "vrf", 4);
   vero("il multisplit proposto ha abbastanza attacchi", perQuattro.consigliati.every((p) => p.maxUnitaInterne >= 4), perQuattro.messaggio || "");
