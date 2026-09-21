@@ -10,6 +10,7 @@
  */
 import { calcolaBollitore } from "../data/calculations.js";
 import {
+  trovaAlternativeDiGamma,
   trovaProdottiConsigliati,
   trovaBollitoriConsigliati,
   trovaFotovoltaicoConsigliati,
@@ -34,7 +35,7 @@ import {
   specificaPompa,
 } from "./specificheProdotto.js";
 
-function voceDaRisultato(chiave, icona, titolo, { consigliati, messaggio }, specificaFn) {
+function voceDaRisultato(chiave, icona, titolo, { consigliati, messaggio }, specificaFn, alternativeGamma = []) {
   const prodotto = consigliati[0] || null;
   return {
     chiave,
@@ -42,6 +43,7 @@ function voceDaRisultato(chiave, icona, titolo, { consigliati, messaggio }, spec
     titolo,
     prodotto,
     alternative: consigliati.slice(1),
+    alternativeGamma,
     specifica: prodotto ? specificaFn(prodotto) : null,
     messaggio,
   };
@@ -66,6 +68,9 @@ export function calcolaVociRiepilogoProdotti({ tipiImpianto, scenario, comune, a
     const centralizzatoAttivo = sistemaCentralizzato?.tipo !== "nessuno" && edificio.risultatiAmbienti.length >= 2;
 
     let risultatoClima;
+    // Le tre alternative di gamma (base, intermedia, top) esistono solo per
+    // gli split: un impianto centralizzato ha una macchina sola.
+    let alternativeGamma = [];
     if (centralizzatoAttivo && sistemaCentralizzato.tipo === "vrf") {
       const d = calcolaDimensionamentoVRF(edificio.risultatiAmbienti, sistemaCentralizzato, comune?.teInv);
       risultatoClima = trovaProdottiConsigliati(d.potenzaNominaleRichiestaKw, "vrf", d.numeroUnitaInterne);
@@ -73,14 +78,13 @@ export function calcolaVociRiepilogoProdotti({ tipiImpianto, scenario, comune, a
       const d = calcolaDimensionamentoChiller(edificio.risultatiAmbienti, sistemaCentralizzato, comune?.teInv);
       risultatoClima = trovaProdottiConsigliati(d.potenzaNominaleRichiestaKw, "chiller");
     } else {
-      risultatoClima = trovaProdottiConsigliati(
-        fabbisognoDimensionamento,
-        "climatizzatore_split",
-        null,
-        sistemaCentralizzato?.tipologiaTerminale
-      );
+      const tipologia = sistemaCentralizzato?.tipologiaTerminale ?? "parete";
+      risultatoClima = trovaProdottiConsigliati(fabbisognoDimensionamento, "climatizzatore_split", null, tipologia);
+      // Vanno messe davanti al cliente insieme: mostrarne una sola gli
+      // nasconde una scelta che è sua.
+      alternativeGamma = trovaAlternativeDiGamma(fabbisognoDimensionamento, tipologia).alternative;
     }
-    voci.push(voceDaRisultato("climatizzazione", "❄️", "Climatizzazione", risultatoClima, specificaClimatizzatore));
+    voci.push(voceDaRisultato("climatizzazione", "❄️", "Climatizzazione", risultatoClima, specificaClimatizzatore, alternativeGamma));
 
     if (fotovoltaico?.attivo) {
       voci.push(voceDaRisultato("fotovoltaico", "☀️", "Fotovoltaico", trovaFotovoltaicoConsigliati(fotovoltaico.kWp), specificaFotovoltaico));

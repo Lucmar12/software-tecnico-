@@ -598,6 +598,36 @@ const ORDINE_CLASSI_ENERGETICHE = ["A+++", "A++", "A+", "A"];
  * sotto i 9.000 BTU, quindi per un ambiente che chiede meno quella è
  * semplicemente la macchina che si installa.
  */
+/**
+ * Posizione di una classe energetica nell'ordine di merito. Lo SCOP può
+ * essere dichiarato per più zone climatiche ("A++/A+++"): si usa il primo
+ * valore, che è quello di clima medio, cioè il riferimento italiano.
+ */
+function rangoClasse(classe) {
+  if (!classe) return ORDINE_CLASSI_ENERGETICHE.length;
+  const primaClasse = String(classe).split("/")[0].trim();
+  const rango = ORDINE_CLASSI_ENERGETICHE.indexOf(primaClasse);
+  return rango === -1 ? ORDINE_CLASSI_ENERGETICHE.length : rango;
+}
+
+/**
+ * Ordine di proposta: prima la classe in raffrescamento, poi quella in
+ * riscaldamento, poi il prezzo.
+ *
+ * Lo SCOP entra nel confronto perché è spesso l'unica differenza fra due
+ * serie: CU-PRO e CA-PRO sono entrambe A+++ in freddo e si distinguono
+ * solo in caldo. Ordinando sul solo SEER le due risultavano pari e vinceva
+ * la più economica, cioè la macchina che rende meno in riscaldamento —
+ * scegliendola per un motivo che non era stato valutato.
+ */
+function confrontaProdotti(a, b) {
+  const freddo = rangoClasse(a.classeEnergetica) - rangoClasse(b.classeEnergetica);
+  if (freddo !== 0) return freddo;
+  const caldo = rangoClasse(a.classeScop) - rangoClasse(b.classeScop);
+  if (caldo !== 0) return caldo;
+  return a.prezzoIndicativoMin - b.prezzoIndicativoMin;
+}
+
 function selezionaPerCapacita(prodotti, richiestaBtu, potenzaDi, margineMax = 1.25) {
   const idonei = prodotti.filter((p) => potenzaDi(p) >= richiestaBtu);
   if (idonei.length === 0) return [];
@@ -660,11 +690,7 @@ export function trovaProdottiConsigliati(fabbisognoKw, tipo = "climatizzatore_sp
 
   const candidati = selezionaPerCapacita(idonei, richiestaBtu, potenzaDi, margineMax);
 
-  candidati.sort((a, b) => {
-    const classeDiff = ORDINE_CLASSI_ENERGETICHE.indexOf(a.classeEnergetica) - ORDINE_CLASSI_ENERGETICHE.indexOf(b.classeEnergetica);
-    if (classeDiff !== 0) return classeDiff;
-    return a.prezzoIndicativoMin - b.prezzoIndicativoMin;
-  });
+  candidati.sort(confrontaProdotti);
 
   const consigliati = candidati.slice(0, 3);
 

@@ -575,6 +575,17 @@ function ambienteRiferimento(extra = {}) {
   ugualeTesto("top: A+++ in entrambe le stagioni", `${alternative[2].prodotto.classeEnergetica} / ${alternative[2].prodotto.classeScop}`, "A+++ / A+++");
   vero("è il riscaldamento a separare intermedia e top", alternative[1].prodotto.classeEnergetica === alternative[2].prodotto.classeEnergetica && alternative[1].prodotto.classeScop !== alternative[2].prodotto.classeScop);
   vero("la top costa più dell'intermedia", alternative[2].prodotto.prezzoIndicativoMin > alternative[1].prodotto.prezzoIndicativoMin);
+  // L'ordine di proposta guarda prima il freddo, poi il caldo, poi il
+  // prezzo. Su CU-PRO e CA-PRO, identiche in freddo, decide il caldo: la
+  // CA-PRO va davanti pur costando di più, perché rende meglio in
+  // riscaldamento. Ordinando sul solo prezzo si sceglieva la macchina
+  // peggiore senza averlo valutato.
+  const ordinati = trovaProdottiConsigliati(3.3, "climatizzatore_split", null, "parete").consigliati;
+  ugualeTesto("in cima va la macchina migliore in riscaldamento", ordinati[0].serie, "CA-PRO");
+  ugualeTesto("poi l'intermedia", ordinati[1].serie, "CU-PRO");
+  ugualeTesto("infine la base", ordinati[2].serie, "Q");
+  vero("la prima costa più della seconda: non è un ordinamento per prezzo", ordinati[0].prezzoIndicativoMin > ordinati[1].prezzoIndicativoMin);
+
   // Le famiglie senza livelli non hanno alternative di gamma: una linea sola.
   uguale("i canalizzabili non hanno livelli di gamma", trovaAlternativeDiGamma(5.0, "canalizzabile").alternative.length, 0);
 
