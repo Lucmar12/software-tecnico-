@@ -12,12 +12,26 @@
  * modello sono quelli dichiarati dal costruttore: non vanno "corretti"
  * per farli tornare con un calcolo.
  *
- * CLASSI SCOP DI CA-PRO E CU-PRO: la tabella stampata riporta la stessa
- * colonna "A++/A+++" per entrambe le serie. È un refuso: le due serie si
- * distinguono proprio sulla resa in riscaldamento — CA-PRO è A+++, CU-PRO
- * è A++ — ed è quella differenza a giustificare il salto di prezzo fra
- * loro. Valore confermato dall'agente che rappresenta il marchio; se una
- * revisione del listino dovesse smentirlo, si corregge qui.
+ * CLASSI ENERGETICHE — trascritte esattamente come le stampa il listino.
+ * `classeSeer` è il RAFFRESCAMENTO, `classeScop` il RISCALDAMENTO: sono
+ * le sigle della normativa e le colonne del listino sono etichettate
+ * così. Scambiarle significa dichiarare una classe sbagliata su un
+ * preventivo.
+ *
+ * DA VERIFICARE — differenza fra CA-PRO e CU-PRO. A listino le due serie
+ * hanno classi IDENTICHE in entrambe le stagioni (SEER A+++, SCOP
+ * "A++/A+++"), quindi la differenza di prezzo non è spiegata
+ * dall'efficienza dichiarata. Qualcosa in quella colonna non torna: il
+ * doppio valore SCOP dovrebbe essere clima medio e clima caldo, ma
+ * nessuno dei due ordini regge per tutte le righe — letto medio/caldo, la
+ * serie Q risulterebbe A+ in clima caldo e A++ in clima medio, mentre una
+ * pompa di calore in clima caldo rende di più, non di meno; letto
+ * caldo/medio, l'anomalia si sposta su CA-PRO e CU-PRO.
+ *
+ * Finché il dato non è verificato sulle schede tecniche AUX o
+ * sull'etichetta ErP del singolo modello, qui resta quello che il listino
+ * stampa: meglio riportare fedelmente un dato ambiguo che inventarne uno
+ * plausibile. NON "correggere" questi valori a intuito.
  *
  * CAPACITÀ: il listino dichiara due valori, freddo e caldo. Per la
  * scelta della macchina si usa il MINORE dei due: l'unità deve coprire
@@ -36,9 +50,9 @@ export const LISTINO_AUX = "Listino Italia 2026, IVA esclusa";
  * non del calcolo.
  */
 export const LIVELLI_GAMMA = [
-  { valore: "base", etichetta: "Base", serie: "Q", descrizione: "Serie Q: la soluzione più economica, A++ in raffrescamento." },
-  { valore: "intermedio", etichetta: "Intermedia", serie: "CU-PRO", descrizione: "Serie CU-PRO: A+++ in raffrescamento e A++ in riscaldamento, unità esterna compatta." },
-  { valore: "top", etichetta: "Top", serie: "CA-PRO", descrizione: "Serie CA-PRO: A+++ in entrambe le stagioni, la migliore resa in riscaldamento." },
+  { valore: "base", etichetta: "Base", serie: "Q", descrizione: "Serie Q: la soluzione più economica, A++ in raffrescamento e A++/A+ in riscaldamento." },
+  { valore: "intermedio", etichetta: "Intermedia", serie: "CU-PRO", descrizione: "Serie CU-PRO: stesse classi della CA-PRO a listino, unità esterna più compatta e prezzo inferiore." },
+  { valore: "top", etichetta: "Top", serie: "CA-PRO", descrizione: "Serie CA-PRO: il massimo di gamma AUX." },
 ];
 
 /** Livelli di efficienza delle unità esterne multisplit. */
@@ -93,20 +107,19 @@ export const TIPOLOGIE_TERMINALE = [
 
 /**
  * MONOSPLIT — una unità interna, una esterna dedicata.
- * Serie CA-PRO e CU-PRO in classe A+++, serie Q in A++.
  */
 export const MONOSPLIT_AUX = [
-  // Serie CA-PRO — top di gamma: A+++ sia in raffrescamento sia in riscaldamento
-  { serie: "CA-PRO", modello: "CA-PRO-09", taglia: 9, freddoKw: 2.7, caldoKw: 3.3, classeSeer: "A+++", classeScop: "A+++", codiceInterna: "FTXM26CA-A", codiceEsterna: "RTX26MCA-T1A", prezzoInterna: 435, prezzoEsterna: 865 },
-  { serie: "CA-PRO", modello: "CA-PRO-12", taglia: 12, freddoKw: 3.5, caldoKw: 4.2, classeSeer: "A+++", classeScop: "A+++", codiceInterna: "FTXM35CA-A", codiceEsterna: "RTX35MCA-T1A", prezzoInterna: 460, prezzoEsterna: 910 },
-  { serie: "CA-PRO", modello: "CA-PRO-18", taglia: 18, freddoKw: 5.4, caldoKw: 5.8, classeSeer: "A+++", classeScop: "A+++", codiceInterna: "FTXM52CA-A", codiceEsterna: "RTX52MCA-T1A", prezzoInterna: 645, prezzoEsterna: 1180 },
-  { serie: "CA-PRO", modello: "CA-PRO-24", taglia: 24, freddoKw: 7.3, caldoKw: 7.2, classeSeer: "A+++", classeScop: "A+++", codiceInterna: "FTXM71CA-A", codiceEsterna: "RTX71MCA-T1A", prezzoInterna: 760, prezzoEsterna: 1570 },
+  // Serie CA-PRO — top di gamma
+  { serie: "CA-PRO", modello: "CA-PRO-09", taglia: 9, freddoKw: 2.7, caldoKw: 3.3, classeSeer: "A+++", classeScop: "A++/A+++", codiceInterna: "FTXM26CA-A", codiceEsterna: "RTX26MCA-T1A", prezzoInterna: 435, prezzoEsterna: 865 },
+  { serie: "CA-PRO", modello: "CA-PRO-12", taglia: 12, freddoKw: 3.5, caldoKw: 4.2, classeSeer: "A+++", classeScop: "A++/A+++", codiceInterna: "FTXM35CA-A", codiceEsterna: "RTX35MCA-T1A", prezzoInterna: 460, prezzoEsterna: 910 },
+  { serie: "CA-PRO", modello: "CA-PRO-18", taglia: 18, freddoKw: 5.4, caldoKw: 5.8, classeSeer: "A+++", classeScop: "A++/A+++", codiceInterna: "FTXM52CA-A", codiceEsterna: "RTX52MCA-T1A", prezzoInterna: 645, prezzoEsterna: 1180 },
+  { serie: "CA-PRO", modello: "CA-PRO-24", taglia: 24, freddoKw: 7.3, caldoKw: 7.2, classeSeer: "A+++", classeScop: "A++/A+++", codiceInterna: "FTXM71CA-A", codiceEsterna: "RTX71MCA-T1A", prezzoInterna: 760, prezzoEsterna: 1570 },
 
-  // Serie CU-PRO — stesse rese della CA-PRO ma SCOP A++, unità esterna più compatta
-  { serie: "CU-PRO", modello: "CU-PRO-09", taglia: 9, freddoKw: 2.7, caldoKw: 3.3, classeSeer: "A+++", classeScop: "A++", codiceInterna: "FTXM26CU1-A", codiceEsterna: "RTX26MCU1-T1A", prezzoInterna: 415, prezzoEsterna: 740 },
-  { serie: "CU-PRO", modello: "CU-PRO-12", taglia: 12, freddoKw: 3.5, caldoKw: 4.2, classeSeer: "A+++", classeScop: "A++", codiceInterna: "FTXM35CU1-A", codiceEsterna: "RTX35MCU1-T1A", prezzoInterna: 435, prezzoEsterna: 780 },
-  { serie: "CU-PRO", modello: "CU-PRO-18", taglia: 18, freddoKw: 5.4, caldoKw: 5.8, classeSeer: "A+++", classeScop: "A++", codiceInterna: "FTXM52CU1-A", codiceEsterna: "RTX52MCU1-T1A", prezzoInterna: 600, prezzoEsterna: 1165 },
-  { serie: "CU-PRO", modello: "CU-PRO-24", taglia: 24, freddoKw: 7.3, caldoKw: 7.2, classeSeer: "A+++", classeScop: "A++", codiceInterna: "FTXM71CU1-A", codiceEsterna: "RTX71MCU1-T1A", prezzoInterna: 715, prezzoEsterna: 1545 },
+  // Serie CU-PRO — stesse rese e stesse classi della CA-PRO a listino, unità esterna più compatta e prezzo inferiore
+  { serie: "CU-PRO", modello: "CU-PRO-09", taglia: 9, freddoKw: 2.7, caldoKw: 3.3, classeSeer: "A+++", classeScop: "A++/A+++", codiceInterna: "FTXM26CU1-A", codiceEsterna: "RTX26MCU1-T1A", prezzoInterna: 415, prezzoEsterna: 740 },
+  { serie: "CU-PRO", modello: "CU-PRO-12", taglia: 12, freddoKw: 3.5, caldoKw: 4.2, classeSeer: "A+++", classeScop: "A++/A+++", codiceInterna: "FTXM35CU1-A", codiceEsterna: "RTX35MCU1-T1A", prezzoInterna: 435, prezzoEsterna: 780 },
+  { serie: "CU-PRO", modello: "CU-PRO-18", taglia: 18, freddoKw: 5.4, caldoKw: 5.8, classeSeer: "A+++", classeScop: "A++/A+++", codiceInterna: "FTXM52CU1-A", codiceEsterna: "RTX52MCU1-T1A", prezzoInterna: 600, prezzoEsterna: 1165 },
+  { serie: "CU-PRO", modello: "CU-PRO-24", taglia: 24, freddoKw: 7.3, caldoKw: 7.2, classeSeer: "A+++", classeScop: "A++/A+++", codiceInterna: "FTXM71CU1-A", codiceEsterna: "RTX71MCU1-T1A", prezzoInterna: 715, prezzoEsterna: 1545 },
 
   // Serie Q — entrata di gamma, A++
   { serie: "Q", modello: "Q-09", taglia: 9, freddoKw: 2.7, caldoKw: 2.7, classeSeer: "A++", classeScop: "A++/A+", codiceInterna: "FTXM26QH-B", codiceEsterna: "RTX26MQH-T1B", prezzoInterna: 306, prezzoEsterna: 477 },

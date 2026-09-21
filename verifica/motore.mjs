@@ -563,12 +563,15 @@ function ambienteRiferimento(extra = {}) {
   ugualeTesto("la top è la CA-PRO", alternative[2].prodotto.serie, "CA-PRO");
   vero("ordinate per prezzo crescente", alternative[0].prodotto.prezzoIndicativoMin < alternative[1].prodotto.prezzoIndicativoMin && alternative[1].prodotto.prezzoIndicativoMin < alternative[2].prodotto.prezzoIndicativoMin);
   vero("stessa taglia commerciale in tutte e tre", new Set(alternative.map((a) => a.prodotto.tagliaCommerciale)).size === 1);
-  // È la resa in riscaldamento a separare intermedia e top: stesso SEER,
-  // SCOP diverso. Senza questa differenza il salto di prezzo non si spiega.
-  ugualeTesto("la base ha SEER A++", alternative[0].prodotto.classeEnergetica, "A++");
-  ugualeTesto("l'intermedia ha SEER A+++ e SCOP A++", `${alternative[1].prodotto.classeEnergetica}/${alternative[1].prodotto.classeScop}`, "A+++/A++");
-  ugualeTesto("la top ha SEER A+++ e SCOP A+++", `${alternative[2].prodotto.classeEnergetica}/${alternative[2].prodotto.classeScop}`, "A+++/A+++");
-  vero("a parità di SEER, la top costa più dell'intermedia", alternative[2].prodotto.prezzoIndicativoMin > alternative[1].prodotto.prezzoIndicativoMin);
+  // Classi come le stampa il listino: la base è A++ in raffrescamento, le
+  // altre due A+++. Il campo classeSeer è SEMPRE il raffrescamento: un
+  // giorno qualcuno sarà tentato di scambiarlo con lo SCOP, e da quel
+  // momento i preventivi dichiarerebbero la classe sbagliata.
+  ugualeTesto("la base è A++ in raffrescamento", alternative[0].prodotto.classeEnergetica, "A++");
+  ugualeTesto("l'intermedia è A+++ in raffrescamento", alternative[1].prodotto.classeEnergetica, "A+++");
+  ugualeTesto("la top è A+++ in raffrescamento", alternative[2].prodotto.classeEnergetica, "A+++");
+  vero("la base ha la classe di raffrescamento più bassa delle altre due", alternative[0].prodotto.classeEnergetica !== alternative[2].prodotto.classeEnergetica);
+  vero("a parità di classe, la top costa più dell'intermedia", alternative[2].prodotto.prezzoIndicativoMin > alternative[1].prodotto.prezzoIndicativoMin);
   // Le famiglie senza livelli non hanno alternative di gamma: una linea sola.
   uguale("i canalizzabili non hanno livelli di gamma", trovaAlternativeDiGamma(5.0, "canalizzabile").alternative.length, 0);
 
