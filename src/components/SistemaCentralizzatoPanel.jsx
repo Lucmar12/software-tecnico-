@@ -2,6 +2,7 @@ import React from "react";
 import { FATTORE_CONTEMPORANEITA_DEFAULT } from "../utils/vrf.js";
 import { FATTORE_CONTEMPORANEITA_CHILLER_DEFAULT } from "../utils/chiller.js";
 import { TIPOLOGIE_TERMINALE } from "../data/gammaAux.js";
+import ConfrontoMonoMulti from "./ConfrontoMonoMulti.jsx";
 
 const inputCls = "mt-1 w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-brand-400";
 
@@ -14,7 +15,7 @@ const inputCls = "mt-1 w-full border border-slate-300 rounded-lg px-2.5 py-1.5 t
  * Richiede almeno 2 ambienti (un impianto centralizzato ha senso solo
  * per servirne più di uno).
  */
-export default function SistemaCentralizzatoPanel({ sistemaCentralizzato, onChange, numeroAmbienti }) {
+export default function SistemaCentralizzatoPanel({ sistemaCentralizzato, onChange, numeroAmbienti, edificio = null }) {
   const tipologiaScelta = sistemaCentralizzato.tipologiaTerminale ?? "parete";
 
   function setTipologia(tipologiaTerminale) {
@@ -71,6 +72,7 @@ export default function SistemaCentralizzatoPanel({ sistemaCentralizzato, onChan
 
       <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
       <h3 className="font-semibold text-slate-800">Sistema di distribuzione</h3>
+      <ConfrontoMonoMulti edificio={edificio} sistemaCentralizzato={sistemaCentralizzato} />
       <div className="grid sm:grid-cols-3 gap-2">
         <OpzioneTipo
           attivo={sistemaCentralizzato.tipo === "nessuno"}

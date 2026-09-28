@@ -28,6 +28,7 @@ import { PARAMETRI_CALCOLO, parametro, parametroDefault } from "../src/utils/par
 import { stimaConsumoAnnuoClimatizzazione } from "../src/utils/fotovoltaico.js";
 import { COLONNE_AMBIENTI, CONVENZIONI_TABELLA, intestazioneColonna } from "../src/utils/colonneAmbienti.js";
 import { CATALOGO_PRODOTTI, trovaProdottiConsigliati, trovaAlternativeDiGamma } from "../src/data/catalogo.js";
+import { confrontaMonoMulti } from "../src/utils/confrontoMonoMulti.js";
 import { MONOSPLIT_AUX, LIGHT_COMMERCIAL_AUX, UNITA_INTERNE_MULTI_AUX, UNITA_ESTERNE_MULTI_AUX, capacitaGarantita, prezzoSistema } from "../src/data/gammaAux.js";
 import { calcolaSuperficieMuriEsterni, sviluppoParetiEsterne, areaFinestra, normalizzaGeometria } from "../src/utils/stime.js";
 import { ORE_DI_CALCOLO, quotaIrraggiamento, temperaturaEsternaOraria, ESCURSIONE_DEFAULT_K } from "../src/utils/profiliOrari.js";
@@ -602,6 +603,59 @@ function ambienteRiferimento(extra = {}) {
   // Un'unità esterna multisplit non può essere proposta per meno interne di quante ne servono.
   const perQuattro = trovaProdottiConsigliati(7.5, "vrf", 4);
   vero("il multisplit proposto ha abbastanza attacchi", perQuattro.consigliati.every((p) => p.maxUnitaInterne >= 4), perQuattro.messaggio || "");
+}
+
+// ---------------------------------------------------------------------
+// CONFRONTO MONOSPLIT / MULTISPLIT
+//
+// Sono due preventivi messi a fianco: se uno dei due numeri è sbagliato,
+// la scelta si sposta sulla macchina sbagliata.
+// ---------------------------------------------------------------------
+{
+  const stanze = [
+    ambienteRiferimento({ nome: "Soggiorno", esposizionePrevalente: "sud" }),
+    ambienteRiferimento({ nome: "Camera 1", esposizionePrevalente: "est", lunghezzaM: 4, larghezzaM: 3, tipoLocale: "camera" }),
+    ambienteRiferimento({ nome: "Camera 2", esposizionePrevalente: "ovest", lunghezzaM: 4, larghezzaM: 3, tipoLocale: "camera" }),
+  ];
+  const ed = calcolaEdificioConOverride(stanze, COMUNE);
+  const fabbisognoEdificioKw = Math.max(ed.totaleInvernaleKw, ed.totaleEstivoKw);
+  const c = confrontaMonoMulti({ risultatiAmbienti: ed.risultatiAmbienti, fabbisognoEdificioKw, tipologiaTerminale: "parete", livello: "intermedio" });
+
+  vero("il confronto è disponibile con tre ambienti", c !== null && c.confrontabili);
+  uguale("una unità esterna per ambiente nel monosplit", c.mono.unitaEsterne, 3);
+  uguale("una sola unità esterna nel multisplit", c.multi.unitaEsterne, 1);
+  uguale("motori tolti dalla facciata", c.motoriRisparmiati, 2);
+
+  // Monosplit: tre macchine complete. 3 × CU-PRO-09 a 1.155 € = 3.465 €.
+  uguale("totale monosplit [€]", c.mono.prezzoTotale, 3 * 1155);
+  // Multisplit: tre interne ML CU-PRO-09 a 415 € più un'esterna.
+  uguale("totale unità interne multisplit [€]", c.multi.prezzoInterne, 3 * 415);
+  uguale("il totale multisplit somma interne ed esterna", c.multi.prezzoTotale, c.multi.prezzoInterne + c.multi.esterna.prezzoIndicativoMin, 1e-9);
+  uguale("differenza fra le due strade [€]", c.differenzaPrezzo, c.multi.prezzoTotale - c.mono.prezzoTotale, 1e-9);
+
+  // L'unità esterna deve avere attacchi sufficienti e coprire il carico
+  // SIMULTANEO, che è minore della somma dei picchi dei singoli ambienti.
+  vero("l'unità esterna ha abbastanza attacchi", c.multi.esterna.maxUnitaInterne >= 3);
+  vero("l'unità esterna copre il carico simultaneo", c.multi.esterna.potenzaKw >= fabbisognoEdificioKw);
+  const sommaPicchi = ed.risultatiAmbienti.reduce((s, r) => s + r.fabbisognoDimensionamento, 0);
+  vero("il multisplit non si dimensiona sulla somma dei picchi", fabbisognoEdificioKw < sommaPicchi, `${fabbisognoEdificioKw.toFixed(2)} < ${sommaPicchi.toFixed(2)}`);
+
+  // Con un solo ambiente il multisplit non è una strada percorribile.
+  const unoSolo = confrontaMonoMulti({ risultatiAmbienti: [ed.risultatiAmbienti[0]], fabbisognoEdificioKw: 2, tipologiaTerminale: "parete" });
+  vero("con un ambiente solo il confronto non si pone", unoSolo === null);
+
+  // Oltre cinque ambienti nessuna unità esterna a catalogo li collega:
+  // va detto perché manca, non lasciato vuoto.
+  const seiAmbienti = calcolaEdificioConOverride(Array.from({ length: 6 }, (_, i) => ambienteRiferimento({ nome: `Stanza ${i + 1}` })), COMUNE);
+  const c6 = confrontaMonoMulti({
+    risultatiAmbienti: seiAmbienti.risultatiAmbienti,
+    fabbisognoEdificioKw: Math.max(seiAmbienti.totaleInvernaleKw, seiAmbienti.totaleEstivoKw),
+    tipologiaTerminale: "parete",
+    livello: "intermedio",
+  });
+  vero("con sei ambienti il multisplit non è componibile", !c6.multi.completo);
+  ugualeTesto("e il motivo è il numero di attacchi", c6.multi.motivoIndisponibilita, "attacchi");
+  vero("il monosplit invece resta componibile", c6.mono.completo);
 }
 
 // ---------------------------------------------------------------------

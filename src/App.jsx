@@ -185,6 +185,10 @@ export default function App() {
 
   const climatizzazionePronta = !tipiImpianto.climatizzazione || scenariCalcolati.length > 0;
 
+  // Edificio calcolato dello scenario che si sta compilando: serve al
+  // confronto mono/multi, che va mostrato accanto alla scelta e non dopo.
+  const edificioAttivo = scenariCalcolati.find((sc) => sc.id === scenarioAttivo.id)?.edificio ?? null;
+
   /**
    * Scenario su cui si basano il prodotto consigliato e il preventivo.
    * Se quello designato è stato cancellato o non è ancora calcolabile si
@@ -293,6 +297,7 @@ export default function App() {
               sistemaCentralizzato={sistemaCentralizzato}
               onChange={setSistemaCentralizzato}
               numeroAmbienti={scenarioAttivo.ambienti.length}
+              edificio={edificioAttivo}
             />
             <FotovoltaicoPanel fotovoltaico={fotovoltaico} onChange={setFotovoltaico} />
           </section>
