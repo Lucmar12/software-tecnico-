@@ -9,10 +9,16 @@ import { formattaEuro, formattaKw } from "../utils/export.js";
  * Sta qui, accanto all'interruttore che sceglie fra le due, e non nella
  * relazione: una scelta si informa mentre la si fa, non dopo.
  *
- * Non indica una vincente. Il prezzo e il numero di unità esterne sono
- * dati di fatto; dove appoggiare i motori, cosa consente il condominio e
- * che aspetto debba avere la facciata il software non lo sa, e sono
- * proprio le cose che di solito decidono.
+ * Non indica una vincente, e si limita a cosa è verificabile dai dati:
+ * quanto costano le due strade e quante unità esterne comportano. Dove
+ * appoggiare i motori e cosa consente il condominio il software non lo
+ * sa, e sono proprio le cose che di solito decidono.
+ *
+ * Fuori da qui restano anche le differenze di funzionamento fra le due
+ * soluzioni: dipendono dal modello e dalla logica di regolazione, non
+ * sono ricavabili dal listino, e scriverne una generica nel documento che
+ * il cliente legge significherebbe affermare qualcosa che non abbiamo
+ * verificato.
  */
 export default function ConfrontoMonoMulti({ edificio, sistemaCentralizzato }) {
   if (!edificio || edificio.risultatiAmbienti.length < 2) return null;
@@ -91,10 +97,9 @@ export default function ConfrontoMonoMulti({ edificio, sistemaCentralizzato }) {
               : `${formattaEuro(Math.abs(differenzaPrezzo))} ${differenzaPrezzo < 0 ? "in meno" : "in più"}`}
           </span>{" "}
           e toglie <span className="font-semibold">{motoriRisparmiati}</span>{" "}
-          {motoriRisparmiati === 1 ? "unità esterna" : "unità esterne"} dalla facciata. In compenso un guasto
-          all'unità esterna ferma tutti gli ambienti insieme, mentre con i monosplit resta fermo solo quello.
-          L'unità esterna del multisplit è dimensionata su {formattaKw(fabbisognoEdificioKw)}, cioè sul carico
-          dell'ora peggiore e non sulla somma dei picchi dei singoli ambienti.
+          {motoriRisparmiati === 1 ? "unità esterna" : "unità esterne"} dalla facciata. L'unità esterna del
+          multisplit è dimensionata su {formattaKw(fabbisognoEdificioKw)}, cioè sul carico dell'ora peggiore e non
+          sulla somma dei picchi dei singoli ambienti.
         </p>
       ) : (
         <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2.5">
