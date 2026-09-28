@@ -7,13 +7,18 @@
  * data/gammaAux.js per la fonte e data/catalogoClimatizzazione.js per la
  * conversione nello schema di questo catalogo.
  *
- * ATTENZIONE — LE ALTRE CATEGORIE SONO ANCORA PLACEHOLDER: bollitori,
- * scaldacqua, solare, fotovoltaico, addolcitori e pompe elencati di
- * seguito sono ESEMPI FITTIZI inseriti per rendere l'applicazione
- * funzionante da subito. Il listino reale dei marchi
- * rappresentati dovrà sostituire questo array MANTENENDO ESATTAMENTE LA
- * STESSA STRUTTURA DATI (stessi campi, stessi nomi di chiave, stesse
- * unità di misura) per non richiedere modifiche al resto dell'applicazione.
+ * LE ALTRE CATEGORIE NON HANNO ANCORA UN LISTINO — pompe di calore
+ * aria-acqua, chiller, bollitori, scaldacqua, solare, fotovoltaico,
+ * addolcitori, autoclavi e pompe. Il loro dimensionamento funziona, ma
+ * nessun prodotto viene proposto: la ricerca risponde "su richiesta" e
+ * rimanda alla quotazione.
+ *
+ * Qui non devono MAI tornare prodotti inventati, nemmeno "per far
+ * vedere com'è": lo strumento va in mano ai clienti, e un marchio finto
+ * accanto a uno vero fa dubitare anche di quello vero. Un controllo in
+ * verifica/motore.mjs lo impedisce. Quando arriva un listino si aggiunge
+ * come la gamma AUX: un file con i dati del costruttore e la conversione
+ * nello schema qui sotto.
  *
  * Schema di ciascun prodotto:
  *   marchio                : string
@@ -40,7 +45,7 @@
  *   seer                   : number|null  — efficienza stagionale raffrescamento
  *   scop                   : number|null  — efficienza stagionale riscaldamento; per gli scaldacqua a
  *                             pompa di calore rappresenta il COP dichiarato in produzione ACS
- *   prezzoIndicativoMin    : number       — € solo unità, IVA esclusa — PLACEHOLDER
+ *   prezzoIndicativoMin    : number       — € IVA esclusa, prezzo di listino
  *   prezzoIndicativoMax    : number
  *   schedaTecnicaUrl       : string       — link alla scheda tecnica del produttore (se disponibile)
  *   note                   : string
@@ -48,6 +53,31 @@
 
 import { PRODOTTI_CLIMATIZZAZIONE_AUX } from "./catalogoClimatizzazione.js";
 import { LIVELLI_GAMMA } from "./gammaAux.js";
+
+/**
+ * Risposta per le categorie che il catalogo non copre ancora. Non è un
+ * "nessun modello": il fabbisogno è calcolato e il prodotto esiste, solo
+ * che non è a listino qui. Per chi usa lo strumento diventa un invito a
+ * chiedere la quotazione invece di un vicolo cieco.
+ */
+export const MESSAGGIO_SU_RICHIESTA =
+  "Prodotto su richiesta: con il fabbisogno calcolato qui sopra ti indichiamo noi il modello adatto e il prezzo.";
+
+/** Vero se per questo tipo di prodotto esiste almeno una voce a listino. */
+export function categoriaACatalogo(tipo) {
+  return CATALOGO_PRODOTTI.some((p) => p.tipo === tipo);
+}
+
+/**
+ * Da chiamare in apertura di ogni ricerca: se la categoria non ha listino
+ * restituisce la risposta "su richiesta", altrimenti null e la ricerca
+ * prosegue. `suRichiesta: true` permette all'interfaccia di mostrare il
+ * rimando alla quotazione invece di un messaggio d'errore.
+ */
+function risultatoSuRichiesta(tipo, chiave = "consigliati") {
+  if (categoriaACatalogo(tipo)) return null;
+  return { [chiave]: [], messaggio: MESSAGGIO_SU_RICHIESTA, suRichiesta: true };
+}
 
 export const CATALOGO_PRODOTTI = [
   // ------------------------------------------------------------------
@@ -57,510 +87,6 @@ export const CATALOGO_PRODOTTI = [
   // ------------------------------------------------------------------
   ...PRODOTTI_CLIMATIZZAZIONE_AUX,
 
-  // ------------------------------------------------------------------
-  // POMPE DI CALORE ARIA-ACQUA — PLACEHOLDER, marchio "AeroClima" (fittizio)
-  // ------------------------------------------------------------------
-  {
-    marchio: "AeroClima [PLACEHOLDER]",
-    modello: "HydroTherm 6",
-    tipo: "pompa_di_calore_aria_acqua",
-    potenzaBtu: null,
-    potenzaKw: 6,
-    capacitaLitri: null,
-    classeEnergetica: "A+++",
-    seer: 5.5,
-    scop: 4.4,
-    prezzoIndicativoMin: 4200,
-    prezzoIndicativoMax: 5400,
-    schedaTecnicaUrl: "",
-    note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
-  },
-  {
-    marchio: "AeroClima [PLACEHOLDER]",
-    modello: "HydroTherm 8",
-    tipo: "pompa_di_calore_aria_acqua",
-    potenzaBtu: null,
-    potenzaKw: 8,
-    capacitaLitri: null,
-    classeEnergetica: "A+++",
-    seer: 5.5,
-    scop: 4.4,
-    prezzoIndicativoMin: 4800,
-    prezzoIndicativoMax: 6100,
-    schedaTecnicaUrl: "",
-    note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
-  },
-
-  // ------------------------------------------------------------------
-  // POMPE DI CALORE ARIA-ACQUA — PLACEHOLDER, marchio "NordikAir" (fittizio)
-  // ------------------------------------------------------------------
-  {
-    marchio: "NordikAir [PLACEHOLDER]",
-    modello: "GeoFlow 12",
-    tipo: "pompa_di_calore_aria_acqua",
-    potenzaBtu: null,
-    potenzaKw: 12,
-    capacitaLitri: null,
-    classeEnergetica: "A++",
-    seer: 4.9,
-    scop: 4.0,
-    prezzoIndicativoMin: 6300,
-    prezzoIndicativoMax: 7900,
-    schedaTecnicaUrl: "",
-    note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
-  },
-  {
-    marchio: "NordikAir [PLACEHOLDER]",
-    modello: "GeoFlow 16",
-    tipo: "pompa_di_calore_aria_acqua",
-    potenzaBtu: null,
-    potenzaKw: 16,
-    capacitaLitri: null,
-    classeEnergetica: "A++",
-    seer: 4.9,
-    scop: 4.0,
-    prezzoIndicativoMin: 7600,
-    prezzoIndicativoMax: 9300,
-    schedaTecnicaUrl: "",
-    note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
-  },
-
-  // ------------------------------------------------------------------
-  // BOLLITORI / SCALDACQUA — PLACEHOLDER, marchio "TermoSicura" (fittizio)
-  // ------------------------------------------------------------------
-  {
-    marchio: "TermoSicura [PLACEHOLDER]",
-    modello: "AquaStore 80",
-    tipo: "bollitore",
-    potenzaBtu: null,
-    potenzaKw: null,
-    capacitaLitri: 80,
-    classeEnergetica: "A+",
-    seer: null,
-    scop: null,
-    prezzoIndicativoMin: 480,
-    prezzoIndicativoMax: 620,
-    schedaTecnicaUrl: "",
-    note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
-  },
-  {
-    marchio: "TermoSicura [PLACEHOLDER]",
-    modello: "AquaStore 100",
-    tipo: "bollitore",
-    potenzaBtu: null,
-    potenzaKw: null,
-    capacitaLitri: 100,
-    classeEnergetica: "A+",
-    seer: null,
-    scop: null,
-    prezzoIndicativoMin: 560,
-    prezzoIndicativoMax: 710,
-    schedaTecnicaUrl: "",
-    note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
-  },
-  {
-    marchio: "TermoSicura [PLACEHOLDER]",
-    modello: "AquaStore 150",
-    tipo: "bollitore",
-    potenzaBtu: null,
-    potenzaKw: null,
-    capacitaLitri: 150,
-    classeEnergetica: "A++",
-    seer: null,
-    scop: null,
-    prezzoIndicativoMin: 720,
-    prezzoIndicativoMax: 890,
-    schedaTecnicaUrl: "",
-    note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
-  },
-  {
-    marchio: "TermoSicura [PLACEHOLDER]",
-    modello: "AquaStore 200",
-    tipo: "bollitore",
-    potenzaBtu: null,
-    potenzaKw: null,
-    capacitaLitri: 200,
-    classeEnergetica: "A++",
-    seer: null,
-    scop: null,
-    prezzoIndicativoMin: 890,
-    prezzoIndicativoMax: 1080,
-    schedaTecnicaUrl: "",
-    note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
-  },
-
-  // ------------------------------------------------------------------
-  // SCALDACQUA A POMPA DI CALORE (accumulo + pompa di calore integrati)
-  // — PLACEHOLDER, marchio "TermoSicura" (fittizio). potenzaKw = potenza
-  // termica resa; scop = COP dichiarato in produzione ACS.
-  // ------------------------------------------------------------------
-  {
-    marchio: "TermoSicura [PLACEHOLDER]",
-    modello: "AquaPump 80",
-    tipo: "scaldacqua_pompa_di_calore",
-    potenzaBtu: null,
-    potenzaKw: 1.5,
-    capacitaLitri: 80,
-    classeEnergetica: "A+",
-    seer: null,
-    scop: 3.4,
-    prezzoIndicativoMin: 980,
-    prezzoIndicativoMax: 1250,
-    schedaTecnicaUrl: "",
-    note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
-  },
-  {
-    marchio: "TermoSicura [PLACEHOLDER]",
-    modello: "AquaPump 100",
-    tipo: "scaldacqua_pompa_di_calore",
-    potenzaBtu: null,
-    potenzaKw: 1.5,
-    capacitaLitri: 100,
-    classeEnergetica: "A+",
-    seer: null,
-    scop: 3.4,
-    prezzoIndicativoMin: 1080,
-    prezzoIndicativoMax: 1380,
-    schedaTecnicaUrl: "",
-    note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
-  },
-  {
-    marchio: "TermoSicura [PLACEHOLDER]",
-    modello: "AquaPump 200",
-    tipo: "scaldacqua_pompa_di_calore",
-    potenzaBtu: null,
-    potenzaKw: 2.0,
-    capacitaLitri: 200,
-    classeEnergetica: "A++",
-    seer: null,
-    scop: 3.2,
-    prezzoIndicativoMin: 1650,
-    prezzoIndicativoMax: 2050,
-    schedaTecnicaUrl: "",
-    note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
-  },
-  {
-    marchio: "TermoSicura [PLACEHOLDER]",
-    modello: "AquaPump 300",
-    tipo: "scaldacqua_pompa_di_calore",
-    potenzaBtu: null,
-    potenzaKw: 2.5,
-    capacitaLitri: 300,
-    classeEnergetica: "A++",
-    seer: null,
-    scop: 3.0,
-    prezzoIndicativoMin: 2100,
-    prezzoIndicativoMax: 2600,
-    schedaTecnicaUrl: "",
-    note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
-  },
-
-  // ------------------------------------------------------------------
-  // CHILLER — PLACEHOLDER, marchio "AeroClima" (fittizio)
-  // Per ville/edifici plurifamiliari con distribuzione ad acqua
-  // (ventilconvettori, pannelli radianti) e produzione centralizzata.
-  // ------------------------------------------------------------------
-  {
-    marchio: "AeroClima [PLACEHOLDER]",
-    modello: "ChillPro 15",
-    tipo: "chiller",
-    potenzaBtu: null,
-    potenzaKw: 15,
-    capacitaLitri: null,
-    classeEnergetica: "A++",
-    seer: 5.2,
-    scop: 3.9,
-    prezzoIndicativoMin: 9800,
-    prezzoIndicativoMax: 12400,
-    schedaTecnicaUrl: "",
-    note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
-  },
-  {
-    marchio: "AeroClima [PLACEHOLDER]",
-    modello: "ChillPro 25",
-    tipo: "chiller",
-    potenzaBtu: null,
-    potenzaKw: 25,
-    capacitaLitri: null,
-    classeEnergetica: "A+",
-    seer: 4.8,
-    scop: 3.6,
-    prezzoIndicativoMin: 14500,
-    prezzoIndicativoMax: 18200,
-    schedaTecnicaUrl: "",
-    note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
-  },
-  {
-    marchio: "NordikAir [PLACEHOLDER]",
-    modello: "GeoChill 35",
-    tipo: "chiller",
-    potenzaBtu: null,
-    potenzaKw: 35,
-    capacitaLitri: null,
-    classeEnergetica: "A+",
-    seer: 4.8,
-    scop: 3.6,
-    prezzoIndicativoMin: 19800,
-    prezzoIndicativoMax: 24700,
-    schedaTecnicaUrl: "",
-    note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
-  },
-
-  // ------------------------------------------------------------------
-  // SOLARE TERMICO (integrazione ACS) — PLACEHOLDER, marchio "TermoSicura" (fittizio)
-  // potenzaKw qui indica la potenza captata di picco del collettore.
-  // ------------------------------------------------------------------
-  {
-    marchio: "TermoSicura [PLACEHOLDER]",
-    modello: "SunFlow 2 pannelli + accumulo 200L",
-    tipo: "solare_termico",
-    potenzaBtu: null,
-    potenzaKw: 2.8,
-    capacitaLitri: 200,
-    classeEnergetica: "A+",
-    seer: null,
-    scop: null,
-    prezzoIndicativoMin: 2400,
-    prezzoIndicativoMax: 3100,
-    schedaTecnicaUrl: "",
-    note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
-  },
-  {
-    marchio: "TermoSicura [PLACEHOLDER]",
-    modello: "SunFlow 3 pannelli + accumulo 300L",
-    tipo: "solare_termico",
-    potenzaBtu: null,
-    potenzaKw: 4.2,
-    capacitaLitri: 300,
-    classeEnergetica: "A+",
-    seer: null,
-    scop: null,
-    prezzoIndicativoMin: 3200,
-    prezzoIndicativoMax: 4100,
-    schedaTecnicaUrl: "",
-    note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
-  },
-
-  // ------------------------------------------------------------------
-  // FOTOVOLTAICO (integrazione elettrica pompa di calore/climatizzatore)
-  // — PLACEHOLDER, marchio "SolarUmbra" (fittizio). potenzaKw = kWp.
-  // ------------------------------------------------------------------
-  {
-    marchio: "SolarUmbra [PLACEHOLDER]",
-    modello: "Kit FV 3 kWp",
-    tipo: "fotovoltaico",
-    potenzaBtu: null,
-    potenzaKw: 3,
-    capacitaLitri: null,
-    classeEnergetica: "-",
-    seer: null,
-    scop: null,
-    prezzoIndicativoMin: 5400,
-    prezzoIndicativoMax: 6800,
-    schedaTecnicaUrl: "",
-    note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
-  },
-  {
-    marchio: "SolarUmbra [PLACEHOLDER]",
-    modello: "Kit FV 6 kWp",
-    tipo: "fotovoltaico",
-    potenzaBtu: null,
-    potenzaKw: 6,
-    capacitaLitri: null,
-    classeEnergetica: "-",
-    seer: null,
-    scop: null,
-    prezzoIndicativoMin: 9200,
-    prezzoIndicativoMax: 11500,
-    schedaTecnicaUrl: "",
-    note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
-  },
-
-  // ------------------------------------------------------------------
-  // ADDOLCITORI A SCAMBIO IONICO — PLACEHOLDER, marchio "AquaPura" (fittizio)
-  // ------------------------------------------------------------------
-  {
-    marchio: "AquaPura [PLACEHOLDER]",
-    modello: "SoftLine 10",
-    tipo: "addolcitore",
-    potenzaBtu: null,
-    potenzaKw: null,
-    capacitaLitri: null,
-    volumeResinaLitri: 10,
-    portataNominaleMc: 1.5,
-    classeEnergetica: "-",
-    seer: null,
-    scop: null,
-    prezzoIndicativoMin: 620,
-    prezzoIndicativoMax: 820,
-    schedaTecnicaUrl: "",
-    note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
-  },
-  {
-    marchio: "AquaPura [PLACEHOLDER]",
-    modello: "SoftLine 16",
-    tipo: "addolcitore",
-    potenzaBtu: null,
-    potenzaKw: null,
-    capacitaLitri: null,
-    volumeResinaLitri: 16,
-    portataNominaleMc: 2.0,
-    classeEnergetica: "-",
-    seer: null,
-    scop: null,
-    prezzoIndicativoMin: 780,
-    prezzoIndicativoMax: 990,
-    schedaTecnicaUrl: "",
-    note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
-  },
-  {
-    marchio: "AquaPura [PLACEHOLDER]",
-    modello: "SoftLine 25",
-    tipo: "addolcitore",
-    potenzaBtu: null,
-    potenzaKw: null,
-    capacitaLitri: null,
-    volumeResinaLitri: 25,
-    portataNominaleMc: 2.8,
-    classeEnergetica: "-",
-    seer: null,
-    scop: null,
-    prezzoIndicativoMin: 1050,
-    prezzoIndicativoMax: 1350,
-    schedaTecnicaUrl: "",
-    note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
-  },
-
-  // ------------------------------------------------------------------
-  // AUTOCLAVI (gruppi di pressurizzazione) — PLACEHOLDER, marchio "IdroSpinta" (fittizio)
-  // ------------------------------------------------------------------
-  {
-    marchio: "IdroSpinta [PLACEHOLDER]",
-    modello: "PressBox 1.1",
-    tipo: "autoclave",
-    potenzaBtu: null,
-    potenzaKw: 1.1,
-    capacitaLitri: null,
-    portataNominaleMc: 2.5,
-    prevalenzaM: 35,
-    classeEnergetica: "-",
-    seer: null,
-    scop: null,
-    prezzoIndicativoMin: 780,
-    prezzoIndicativoMax: 980,
-    schedaTecnicaUrl: "",
-    note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
-  },
-  {
-    marchio: "IdroSpinta [PLACEHOLDER]",
-    modello: "PressBox 1.5",
-    tipo: "autoclave",
-    potenzaBtu: null,
-    potenzaKw: 1.5,
-    capacitaLitri: null,
-    portataNominaleMc: 3.6,
-    prevalenzaM: 48,
-    classeEnergetica: "-",
-    seer: null,
-    scop: null,
-    prezzoIndicativoMin: 980,
-    prezzoIndicativoMax: 1250,
-    schedaTecnicaUrl: "",
-    note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
-  },
-  {
-    marchio: "IdroSpinta [PLACEHOLDER]",
-    modello: "PressBox 2.2",
-    tipo: "autoclave",
-    potenzaBtu: null,
-    potenzaKw: 2.2,
-    capacitaLitri: null,
-    portataNominaleMc: 5.0,
-    prevalenzaM: 62,
-    classeEnergetica: "-",
-    seer: null,
-    scop: null,
-    prezzoIndicativoMin: 1350,
-    prezzoIndicativoMax: 1700,
-    schedaTecnicaUrl: "",
-    note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
-  },
-
-  // ------------------------------------------------------------------
-  // POMPE DI SOLLEVAMENTO — PLACEHOLDER, marchio "IdroSpinta" (fittizio)
-  // ------------------------------------------------------------------
-  {
-    marchio: "IdroSpinta [PLACEHOLDER]",
-    modello: "LiftFlow 0.75",
-    tipo: "pompa_sollevamento",
-    potenzaBtu: null,
-    potenzaKw: 0.75,
-    capacitaLitri: null,
-    portataNominaleMc: 3.0,
-    prevalenzaM: 20,
-    classeEnergetica: "-",
-    seer: null,
-    scop: null,
-    prezzoIndicativoMin: 320,
-    prezzoIndicativoMax: 450,
-    schedaTecnicaUrl: "",
-    note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
-  },
-  {
-    marchio: "IdroSpinta [PLACEHOLDER]",
-    modello: "LiftFlow 1.5",
-    tipo: "pompa_sollevamento",
-    potenzaBtu: null,
-    potenzaKw: 1.5,
-    capacitaLitri: null,
-    portataNominaleMc: 5.5,
-    prevalenzaM: 38,
-    classeEnergetica: "-",
-    seer: null,
-    scop: null,
-    prezzoIndicativoMin: 480,
-    prezzoIndicativoMax: 650,
-    schedaTecnicaUrl: "",
-    note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
-  },
-
-  // ------------------------------------------------------------------
-  // POMPE DI CIRCOLAZIONE (ricircolo ACS) — PLACEHOLDER, marchio "IdroSpinta" (fittizio)
-  // ------------------------------------------------------------------
-  {
-    marchio: "IdroSpinta [PLACEHOLDER]",
-    modello: "CircoFlow Mini",
-    tipo: "pompa_circolazione",
-    potenzaBtu: null,
-    potenzaKw: 0.03,
-    capacitaLitri: null,
-    portataNominaleMc: 0.6,
-    prevalenzaM: 2,
-    classeEnergetica: "A",
-    seer: null,
-    scop: null,
-    prezzoIndicativoMin: 110,
-    prezzoIndicativoMax: 160,
-    schedaTecnicaUrl: "",
-    note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
-  },
-  {
-    marchio: "IdroSpinta [PLACEHOLDER]",
-    modello: "CircoFlow Plus",
-    tipo: "pompa_circolazione",
-    potenzaBtu: null,
-    potenzaKw: 0.06,
-    capacitaLitri: null,
-    portataNominaleMc: 1.5,
-    prevalenzaM: 4,
-    classeEnergetica: "A",
-    seer: null,
-    scop: null,
-    prezzoIndicativoMin: 150,
-    prezzoIndicativoMax: 210,
-    schedaTecnicaUrl: "",
-    note: "Dato di esempio — sostituire con listino reale del marchio rappresentato",
-  },
 ];
 
 const ORDINE_CLASSI_ENERGETICHE = ["A+++", "A++", "A+", "A"];
@@ -648,6 +174,8 @@ function selezionaPerCapacita(prodotti, richiestaBtu, potenzaDi, margineMax = 1.
  * normale.
  */
 export function trovaAlternativeDiGamma(fabbisognoKw, tipologiaTerminale = "parete") {
+  const suRichiesta = risultatoSuRichiesta("climatizzatore_split", "alternative");
+  if (suRichiesta) return suRichiesta;
   const richiestaBtu = fabbisognoKw * 3412;
   const potenzaDi = (p) => p.potenzaBtu;
 
@@ -670,6 +198,8 @@ export function trovaAlternativeDiGamma(fabbisognoKw, tipologiaTerminale = "pare
 }
 
 export function trovaProdottiConsigliati(fabbisognoKw, tipo = "climatizzatore_split", numeroUnitaRichieste = null, tipologiaTerminale = null) {
+  const suRichiesta = risultatoSuRichiesta(tipo);
+  if (suRichiesta) return suRichiesta;
   const fabbisognoBtu = fabbisognoKw * 3412;
   const margineMax = 1.25;
   const basatoSuBtu = tipo === "climatizzatore_split";
@@ -707,6 +237,8 @@ export function trovaProdottiConsigliati(fabbisognoKw, tipo = "climatizzatore_sp
 
 /** Individua i pannelli solari termici a catalogo idonei a fornire una data capacità di accumulo integrativa [litri], stessa logica di margine +25% max. */
 export function trovaPannelliSolariConsigliati(litriRichiesti) {
+  const suRichiesta = risultatoSuRichiesta("solare_termico");
+  if (suRichiesta) return suRichiesta;
   const margineMax = 1.25;
   const candidati = CATALOGO_PRODOTTI.filter(
     (p) => p.tipo === "solare_termico" && p.capacitaLitri >= litriRichiesti && p.capacitaLitri <= litriRichiesti * margineMax
@@ -724,6 +256,8 @@ export function trovaPannelliSolariConsigliati(litriRichiesti) {
 
 /** Individua i bollitori a catalogo idonei a coprire una data capacità richiesta, con la stessa logica di margine +25% max. */
 export function trovaBollitoriConsigliati(litriRichiesti) {
+  const suRichiesta = risultatoSuRichiesta("bollitore");
+  if (suRichiesta) return suRichiesta;
   const margineMax = 1.25;
   const candidati = CATALOGO_PRODOTTI.filter(
     (p) => p.tipo === "bollitore" && p.capacitaLitri >= litriRichiesti && p.capacitaLitri <= litriRichiesti * margineMax
@@ -749,6 +283,8 @@ export function trovaBollitoriConsigliati(litriRichiesti) {
  * per il tempo di ricarica desiderato (vedi utils/pompaDiCaloreAcs.js).
  */
 export function trovaScaldacquaPdCConsigliati(litriRichiesti, potenzaKwRichiesta) {
+  const suRichiesta = risultatoSuRichiesta("scaldacqua_pompa_di_calore");
+  if (suRichiesta) return suRichiesta;
   const margineMax = 1.25;
   const candidati = CATALOGO_PRODOTTI.filter(
     (p) =>
@@ -779,6 +315,8 @@ export function trovaScaldacquaPdCConsigliati(litriRichiesti, potenzaKwRichiesta
  * fabbisogno (i risultati restano ordinati per prezzo crescente).
  */
 export function trovaAddolcitoriConsigliati(volumeResinaRichiestoLitri, portataPuntaMc) {
+  const suRichiesta = risultatoSuRichiesta("addolcitore");
+  if (suRichiesta) return suRichiesta;
   const candidati = CATALOGO_PRODOTTI.filter(
     (p) => p.tipo === "addolcitore" && p.volumeResinaLitri >= volumeResinaRichiestoLitri && p.portataNominaleMc >= portataPuntaMc
   );
@@ -803,6 +341,8 @@ export function trovaAddolcitoriConsigliati(volumeResinaRichiestoLitri, portataP
  * prezzo crescente, quindi la prima proposta è la più piccola idonea.
  */
 export function trovaPompeConsigliate(tipo, portataMcRichiesta, prevalenzaMRichiesta) {
+  const suRichiesta = risultatoSuRichiesta(tipo);
+  if (suRichiesta) return suRichiesta;
   const candidati = CATALOGO_PRODOTTI.filter(
     (p) => p.tipo === tipo && p.portataNominaleMc >= portataMcRichiesta && p.prevalenzaM >= prevalenzaMRichiesta
   );
@@ -819,6 +359,8 @@ export function trovaPompeConsigliate(tipo, portataMcRichiesta, prevalenzaMRichi
 
 /** Individua gli impianti fotovoltaici a catalogo idonei a coprire una data taglia richiesta [kWp], stessa logica di margine +25% max. */
 export function trovaFotovoltaicoConsigliati(kWpRichiesti) {
+  const suRichiesta = risultatoSuRichiesta("fotovoltaico");
+  if (suRichiesta) return suRichiesta;
   const margineMax = 1.25;
   const candidati = CATALOGO_PRODOTTI.filter(
     (p) => p.tipo === "fotovoltaico" && p.potenzaKw >= kWpRichiesti && p.potenzaKw <= kWpRichiesti * margineMax

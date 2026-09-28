@@ -34,7 +34,7 @@ export default function RiepilogoSceltaProdotti({ voci, nomeScenario = null }) {
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3">
       <div>
-        <h2 className="font-bold text-lg text-slate-800">Prodotto consigliato — per categoria</h2>
+        <h2 className="font-bold text-lg text-slate-800">Prodotti per il tuo impianto</h2>
         {nomeScenario && (
           <p className="text-sm text-brand-700 font-semibold mt-0.5">
             Riferito alla situazione che vuoi realizzare: {nomeScenario}
@@ -103,7 +103,12 @@ function BloccoGamma({ voce }) {
   );
 }
 
-function CardScelta({ icona, titolo, prodotto, specifica, messaggio }) {
+/** Porta l'utente alla richiesta di quotazione, che sta più in basso nella stessa scheda. */
+function vaiAllaQuotazione() {
+  document.getElementById("richiedi-preventivo")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function CardScelta({ icona, titolo, prodotto, specifica, messaggio, suRichiesta }) {
   return (
     <div className="rounded-xl border-2 border-brand-400 bg-brand-50/40 p-3.5 flex flex-col gap-1.5">
       <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-brand-700">
@@ -121,6 +126,20 @@ function CardScelta({ icona, titolo, prodotto, specifica, messaggio }) {
               ? formattaEuro(prodotto.prezzoIndicativoMin)
               : `${formattaEuro(prodotto.prezzoIndicativoMin)}–${formattaEuro(prodotto.prezzoIndicativoMax)}`}
           </div>
+        </>
+      ) : suRichiesta ? (
+        <>
+          <div className="text-sm font-bold text-slate-800 leading-tight">Su richiesta</div>
+          <p className="text-xs text-slate-500 leading-snug">
+            Il fabbisogno è calcolato: ti indichiamo noi il modello adatto e il prezzo.
+          </p>
+          <button
+            type="button"
+            onClick={vaiAllaQuotazione}
+            className="mt-1 self-start text-xs font-semibold px-3 py-1.5 rounded-lg bg-brand-600 text-white hover:bg-brand-700 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-400 no-print"
+          >
+            Chiedi la quotazione →
+          </button>
         </>
       ) : (
         <p className="text-xs text-slate-500">{messaggio || "Nessun prodotto a catalogo copre questo fabbisogno — contattaci per una soluzione su misura"}</p>

@@ -30,7 +30,7 @@ export default function CatalogoTabella({ fabbisognoKw, tipo = "climatizzatore_s
             <th className="text-right px-3 py-2">Classe</th>
             <th className="text-right px-3 py-2">SEER</th>
             <th className="text-right px-3 py-2">SCOP</th>
-            <th className="text-right px-3 py-2">Prezzo indicativo (IVA escl.)</th>
+            <th className="text-right px-3 py-2">Prezzo di listino (IVA escl.)</th>
             <th className="text-right px-3 py-2">Scheda</th>
           </tr>
         </thead>
@@ -49,7 +49,9 @@ export default function CatalogoTabella({ fabbisognoKw, tipo = "climatizzatore_s
               <td className="text-right px-3 py-2">{p.seer ?? "-"}</td>
               <td className="text-right px-3 py-2">{p.scop ?? "-"}</td>
               <td className="text-right px-3 py-2 text-slate-500">
-                {formattaEuro(p.prezzoIndicativoMin)} – {formattaEuro(p.prezzoIndicativoMax)}
+                {p.prezzoIndicativoMin === p.prezzoIndicativoMax
+                  ? formattaEuro(p.prezzoIndicativoMin)
+                  : `${formattaEuro(p.prezzoIndicativoMin)} – ${formattaEuro(p.prezzoIndicativoMax)}`}
               </td>
               <td className="text-right px-3 py-2">
                 {p.schedaTecnicaUrl ? (
@@ -65,8 +67,8 @@ export default function CatalogoTabella({ fabbisognoKw, tipo = "climatizzatore_s
         </tbody>
       </table>
       <p className="text-[11px] text-slate-400 mt-1">
-        Prezzi indicativi PLACEHOLDER, solo unità, IVA esclusa — da sostituire con listino reale del marchio
-        rappresentato.
+        Prezzi di listino IVA esclusa, unità interna più esterna. Non comprendono staffe, linea frigorifera,
+        installazione e messa in servizio.
       </p>
     </div>
   );

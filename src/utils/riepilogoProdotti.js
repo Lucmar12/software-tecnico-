@@ -35,7 +35,7 @@ import {
   specificaPompa,
 } from "./specificheProdotto.js";
 
-function voceDaRisultato(chiave, icona, titolo, { consigliati, messaggio }, specificaFn, alternativeGamma = []) {
+function voceDaRisultato(chiave, icona, titolo, { consigliati, messaggio, suRichiesta = false }, specificaFn, alternativeGamma = []) {
   const prodotto = consigliati[0] || null;
   return {
     chiave,
@@ -46,6 +46,7 @@ function voceDaRisultato(chiave, icona, titolo, { consigliati, messaggio }, spec
     alternativeGamma,
     specifica: prodotto ? specificaFn(prodotto) : null,
     messaggio,
+    suRichiesta,
   };
 }
 

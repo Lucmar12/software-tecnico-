@@ -27,7 +27,18 @@ import { calcolaBollitore, kwToBtu, btuToKw, TRASMITTANZE_PER_EPOCA, MAGGIORAZIO
 import { PARAMETRI_CALCOLO, parametro, parametroDefault } from "../src/utils/parametriCalcolo.js";
 import { stimaConsumoAnnuoClimatizzazione } from "../src/utils/fotovoltaico.js";
 import { COLONNE_AMBIENTI, CONVENZIONI_TABELLA, intestazioneColonna } from "../src/utils/colonneAmbienti.js";
-import { CATALOGO_PRODOTTI, trovaProdottiConsigliati, trovaAlternativeDiGamma } from "../src/data/catalogo.js";
+import {
+  CATALOGO_PRODOTTI,
+  MESSAGGIO_SU_RICHIESTA,
+  trovaProdottiConsigliati,
+  trovaAlternativeDiGamma,
+  trovaBollitoriConsigliati,
+  trovaAddolcitoriConsigliati,
+  trovaPompeConsigliate,
+  trovaFotovoltaicoConsigliati,
+  trovaPannelliSolariConsigliati,
+  trovaScaldacquaPdCConsigliati,
+} from "../src/data/catalogo.js";
 import { confrontaMonoMulti } from "../src/utils/confrontoMonoMulti.js";
 import { MONOSPLIT_AUX, LIGHT_COMMERCIAL_AUX, UNITA_INTERNE_MULTI_AUX, UNITA_ESTERNE_MULTI_AUX, capacitaGarantita, prezzoSistema } from "../src/data/gammaAux.js";
 import { calcolaSuperficieMuriEsterni, sviluppoParetiEsterne, areaFinestra, normalizzaGeometria } from "../src/utils/stime.js";
@@ -603,6 +614,44 @@ function ambienteRiferimento(extra = {}) {
   // Un'unità esterna multisplit non può essere proposta per meno interne di quante ne servono.
   const perQuattro = trovaProdottiConsigliati(7.5, "vrf", 4);
   vero("il multisplit proposto ha abbastanza attacchi", perQuattro.consigliati.every((p) => p.maxUnitaInterne >= 4), perQuattro.messaggio || "");
+}
+
+// ---------------------------------------------------------------------
+// NESSUN PRODOTTO INVENTATO
+//
+// Lo strumento va in mano ai clienti. Un marchio fittizio accanto a uno
+// vero fa dubitare anche di quello vero, quindi nel catalogo possono stare
+// solo prodotti con marchio reale. Le categorie senza listino rispondono
+// "su richiesta" e rimandano alla quotazione.
+// ---------------------------------------------------------------------
+{
+  const marchiFittizi = ["PLACEHOLDER", "AeroClima", "NordikAir", "TermoSicura", "IdroSpinta", "AquaPura", "SolarUmbra"];
+  const inventati = CATALOGO_PRODOTTI.filter((p) => marchiFittizi.some((m) => String(p.marchio).includes(m)));
+  vero("nessun prodotto con marchio inventato nel catalogo", inventati.length === 0, inventati.map((p) => p.marchio).join(", "));
+
+  // Le categorie senza listino: il dimensionamento c'è, il prodotto no.
+  const suRichiesta = [
+    ["bollitore", trovaBollitoriConsigliati(180)],
+    ["scaldacqua a pompa di calore", trovaScaldacquaPdCConsigliati(200, 1.2)],
+    ["solare termico", trovaPannelliSolariConsigliati(200)],
+    ["fotovoltaico", trovaFotovoltaicoConsigliati(4)],
+    ["addolcitore", trovaAddolcitoriConsigliati(6, 1.48)],
+    ["autoclave", trovaPompeConsigliate("autoclave", 1.48, 22.5)],
+    ["pompa di calore aria-acqua", trovaProdottiConsigliati(4, "pompa_di_calore_aria_acqua")],
+    ["chiller", trovaProdottiConsigliati(10, "chiller")],
+  ];
+  for (const [nome, r] of suRichiesta) {
+    vero(`${nome}: nessun prodotto proposto`, r.consigliati.length === 0);
+    vero(`${nome}: risposta "su richiesta" con rimando alla quotazione`, r.suRichiesta === true && r.messaggio === MESSAGGIO_SU_RICHIESTA);
+  }
+
+  // Il condizionamento, che ha un listino vero, continua a proporre prodotti.
+  const clima = trovaProdottiConsigliati(3.3, "climatizzatore_split", null, "parete");
+  vero("la climatizzazione propone prodotti reali", clima.consigliati.length > 0 && !clima.suRichiesta);
+  // E fuori gamma resta "nessun modello", non "su richiesta": lì la
+  // macchina davvero non c'è a listino, e sono due risposte diverse.
+  const fuoriGamma = trovaProdottiConsigliati(40, "climatizzatore_split");
+  vero("fuori gamma la risposta non è 'su richiesta'", fuoriGamma.consigliati.length === 0 && !fuoriGamma.suRichiesta);
 }
 
 // ---------------------------------------------------------------------
