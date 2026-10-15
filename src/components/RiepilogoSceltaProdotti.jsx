@@ -108,7 +108,7 @@ function vaiAllaQuotazione() {
   document.getElementById("richiedi-preventivo")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-function CardScelta({ icona, titolo, prodotto, specifica, messaggio, suRichiesta }) {
+function CardScelta({ icona, titolo, prodotto, specifica, messaggio, suRichiesta, specificaRichiesta }) {
   return (
     <div className="rounded-xl border-2 border-brand-400 bg-brand-50/40 p-3.5 flex flex-col gap-1.5">
       <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-brand-700">
@@ -130,6 +130,7 @@ function CardScelta({ icona, titolo, prodotto, specifica, messaggio, suRichiesta
       ) : suRichiesta ? (
         <>
           <div className="text-sm font-bold text-slate-800 leading-tight">Su richiesta</div>
+          {specificaRichiesta && <div className="text-xs font-medium text-slate-700 leading-snug">{specificaRichiesta}</div>}
           <p className="text-xs text-slate-500 leading-snug">
             Il fabbisogno è calcolato: ti indichiamo noi il modello adatto e il prezzo.
           </p>

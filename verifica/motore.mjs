@@ -38,8 +38,11 @@ import {
   trovaFotovoltaicoConsigliati,
   trovaPannelliSolariConsigliati,
   trovaScaldacquaPdCConsigliati,
+  trovaGeneratoriBiomassaConsigliati,
 } from "../src/data/catalogo.js";
 import { confrontaMonoMulti } from "../src/utils/confrontoMonoMulti.js";
+import { dimensionaBiomassa, ambientiServiti, descrizioneApparecchio, POTENZA_MINIMA_COMMERCIALE_KW } from "../src/utils/biomassa.js";
+import { oreEquivalentiRiscaldamento } from "../src/utils/fotovoltaico.js";
 import { MONOSPLIT_AUX, LIGHT_COMMERCIAL_AUX, UNITA_INTERNE_MULTI_AUX, UNITA_ESTERNE_MULTI_AUX, capacitaGarantita, prezzoSistema } from "../src/data/gammaAux.js";
 import { calcolaSuperficieMuriEsterni, sviluppoParetiEsterne, areaFinestra, normalizzaGeometria } from "../src/utils/stime.js";
 import { ORE_DI_CALCOLO, quotaIrraggiamento, temperaturaEsternaOraria, ESCURSIONE_DEFAULT_K } from "../src/utils/profiliOrari.js";
@@ -652,6 +655,132 @@ function ambienteRiferimento(extra = {}) {
   // macchina davvero non c'è a listino, e sono due risposte diverse.
   const fuoriGamma = trovaProdottiConsigliati(40, "climatizzatore_split");
   vero("fuori gamma la risposta non è 'su richiesta'", fuoriGamma.consigliati.length === 0 && !fuoriGamma.suRichiesta);
+}
+
+// ---------------------------------------------------------------------
+// STUFE E CAMINI — pellet e legna
+//
+// Ambienti costruiti a mano con carichi tondi, così ogni valore atteso si
+// verifica a mente: soggiorno 6 kW, camera 2 kW, cucina 3 kW.
+// Comune di riferimento: zona D, 1.750 gradi giorno, ΔT di progetto 22 K,
+//   ore equivalenti = 1.750 × 24 / 22 × 0,75 = 1.431,82 h
+// ---------------------------------------------------------------------
+{
+  const casa = [
+    { ambiente: { id: "s", nome: "Soggiorno", tipoLocale: "soggiorno" }, invernaleKw: 6 },
+    { ambiente: { id: "c", nome: "Camera", tipoLocale: "camera" }, invernaleKw: 2 },
+    { ambiente: { id: "k", nome: "Cucina", tipoLocale: "cucina" }, invernaleKw: 3 },
+  ];
+  const ore = (1750 * 24) / 22 * 0.75;
+
+  // --- Quali ambienti scalda ---
+  // Ad aria, senza indicazioni, si parte dal soggiorno: è dove si mette la stufa.
+  const implicito = ambientiServiti(casa.map((r) => r.ambiente), "aria");
+  vero("ad aria, senza scelta, scalda il soggiorno", implicito.ambienti.length === 1 && implicito.ambienti[0].id === "s");
+  vero("e la scelta implicita è dichiarata", implicito.implicita === true);
+  // Senza soggiorno si parte dal primo ambiente.
+  const senzaSoggiorno = ambientiServiti([{ id: "x", tipoLocale: "camera" }, { id: "y", tipoLocale: "bagno" }], "aria");
+  ugualeTesto("senza soggiorno si parte dal primo ambiente", senzaSoggiorno.ambienti[0].id, "x");
+  // Gli ambienti segnati dall'utente prevalgono.
+  const segnati = ambientiServiti([{ ...casa[0].ambiente, servitoDaBiomassa: true }, casa[1].ambiente, { ...casa[2].ambiente, servitoDaBiomassa: true }], "aria");
+  ugualeTesto("ad aria scalda gli ambienti segnati", segnati.ambienti.map((a) => a.id).join(","), "s,k");
+  // Idro scalda l'acqua dell'impianto: tutti gli ambienti, qualunque segno.
+  uguale("idro scalda tutti gli ambienti", ambientiServiti(casa.map((r) => r.ambiente), "idro").ambienti.length, 3);
+
+  // --- Stufa a pellet ad aria sul soggiorno ---
+  // carico 6 kW · pellet modula, margine 25% → 6,0–7,5 kW
+  const pellet = dimensionaBiomassa({ risultatiAmbienti: casa, comune: COMUNE, biomassa: { combustibile: "pellet", apparecchio: "stufa", distribuzione: "aria" } });
+  uguale("pellet ad aria: carico del solo soggiorno [kW]", pellet.caricoKw, 6);
+  uguale("pellet: potenza minima = carico [kW]", pellet.potenzaMinimaKw, 6);
+  uguale("pellet: potenza massima = carico × 1,25 [kW]", pellet.potenzaMassimaKw, 7.5, 1e-9);
+  // calore utile per kg = 4,6 kWh/kg × 90% = 4,14 kWh/kg
+  uguale("pellet: calore utile per kg [kWh/kg]", pellet.energiaUtilePerKg, 4.14, 1e-9);
+  // al giorno più freddo: 6 kW ÷ 4,14 = 1,449 kg/h
+  uguale("pellet: consumo al giorno più freddo [kg/h]", pellet.consumoOrarioProgettoKg, 6 / 4.14, 1e-9);
+  // in un anno: 6 × 1.431,82 = 8.590,9 kWh ÷ 4,14 = 2.075,1 kg = 138,3 sacchi × 6 € = 830,1 €
+  uguale("pellet: ore equivalenti [h]", pellet.oreEquivalenti, ore, 1e-9);
+  uguale("pellet: calore fornito in un anno [kWh]", pellet.fabbisognoAnnuoKwh, 6 * ore, 1e-6);
+  uguale("pellet: combustibile in un anno [kg]", pellet.combustibileAnnuoKg, (6 * ore) / 4.14, 1e-6);
+  uguale("pellet: sacchi da 15 kg in un anno", pellet.unitaAnno, (6 * ore) / 4.14 / 15, 1e-6);
+  uguale("pellet: costo annuo a 6 € il sacco [€]", pellet.costoAnnuo, ((6 * ore) / 4.14 / 15) * 6, 1e-6);
+  ugualeTesto("pellet: descrizione dell'apparecchio da cercare", descrizioneApparecchio(pellet), "Stufa a pellet ad aria · potenza nominale 6.0–7.5 kW");
+
+  // --- Stufa a legna: margine stretto, perché la legna non modula ---
+  // carico 6 kW · margine 10% → 6,0–6,6 kW · calore utile 4,0 × 80% = 3,2 kWh/kg
+  const legna = dimensionaBiomassa({ risultatiAmbienti: casa, comune: COMUNE, biomassa: { combustibile: "legna", apparecchio: "stufa", distribuzione: "aria" } });
+  uguale("legna: potenza massima = carico × 1,10 [kW]", legna.potenzaMassimaKw, 6.6, 1e-9);
+  uguale("legna: calore utile per kg [kWh/kg]", legna.energiaUtilePerKg, 3.2, 1e-9);
+  uguale("legna: quintali in un anno", legna.unitaAnno, (6 * ore) / 3.2 / 100, 1e-9);
+  vero("il margine della legna è più stretto di quello del pellet", legna.potenzaMassimaKw < pellet.potenzaMassimaKw);
+  // Il camino a legna rende meno della stufa: a parità di calore brucia di più.
+  const caminoLegna = dimensionaBiomassa({ risultatiAmbienti: casa, comune: COMUNE, biomassa: { combustibile: "legna", apparecchio: "camino", distribuzione: "aria" } });
+  uguale("camino a legna: rendimento di riferimento", caminoLegna.rendimento, 0.75);
+  vero("il camino brucia più legna della stufa a parità di calore", caminoLegna.combustibileAnnuoKg > legna.combustibileAnnuoKg);
+
+  // --- Termostufa idro: tutta la casa ---
+  // carico 6 + 2 + 3 = 11 kW, sopra la taglia minima idro di 10 kW → 11,0–13,75 kW
+  const idro = dimensionaBiomassa({ risultatiAmbienti: casa, comune: COMUNE, biomassa: { combustibile: "pellet", apparecchio: "stufa", distribuzione: "idro" } });
+  uguale("idro: carico di tutti gli ambienti [kW]", idro.caricoKw, 11);
+  uguale("idro: potenza massima [kW]", idro.potenzaMassimaKw, 13.75, 1e-9);
+  vero("idro: richiede la progettazione con l'impianto", idro.requisiti.some((q) => q.includes("puffer")));
+
+  // --- Quota di copertura: se integra un altro impianto brucia di meno ---
+  const meta = dimensionaBiomassa({ risultatiAmbienti: casa, comune: COMUNE, biomassa: { combustibile: "pellet", apparecchio: "stufa", distribuzione: "aria", quotaCoperturaPct: 50 } });
+  uguale("al 50% di copertura serve metà combustibile", meta.combustibileAnnuoKg, pellet.combustibileAnnuoKg / 2, 1e-9);
+  vero("ma la potenza resta quella del giorno più freddo", meta.potenzaMinimaKw === pellet.potenzaMinimaKw);
+
+  // --- Rendimento e prezzo inseriti dall'utente prevalgono ---
+  const scheda = dimensionaBiomassa({ risultatiAmbienti: casa, comune: COMUNE, biomassa: { combustibile: "pellet", apparecchio: "stufa", distribuzione: "aria", rendimento: 0.92, prezzoUnita: 7 } });
+  uguale("il rendimento di scheda sostituisce quello di riferimento", scheda.energiaUtilePerKg, 4.6 * 0.92, 1e-9);
+  uguale("il prezzo inserito sostituisce quello indicativo [€]", scheda.costoAnnuo, scheda.unitaAnno * 7, 1e-9);
+
+  // --- Taglia minima di mercato ---
+  // Un ambiente da 1,2 kW: nessuna stufa ad aria è così piccola, si propone la minima.
+  const piccolo = dimensionaBiomassa({
+    risultatiAmbienti: [{ ambiente: { id: "p", nome: "Studio", tipoLocale: "soggiorno" }, invernaleKw: 1.2 }],
+    comune: COMUNE,
+    biomassa: { combustibile: "pellet", apparecchio: "stufa", distribuzione: "aria" },
+  });
+  vero("sotto la taglia minima si propone la più piccola in commercio", piccolo.sottoTagliaMinima && piccolo.potenzaMinimaKw === POTENZA_MINIMA_COMMERCIALE_KW.aria);
+  vero("con il pellet non è un problema: nessuna avvertenza", piccolo.avvertenze.length === 0);
+  // Ma i consumi restano quelli del carico vero, non della taglia proposta.
+  uguale("i consumi seguono il carico, non la taglia", piccolo.consumoOrarioProgettoKg, 1.2 / 4.14, 1e-9);
+  const piccoloLegna = dimensionaBiomassa({
+    risultatiAmbienti: [{ ambiente: { id: "p", nome: "Studio", tipoLocale: "soggiorno" }, invernaleKw: 1.2 }],
+    comune: COMUNE,
+    biomassa: { combustibile: "legna", apparecchio: "stufa", distribuzione: "aria" },
+  });
+  vero("con la legna sotto la taglia minima si avverte: lavorerebbe sempre al minimo", piccoloLegna.avvertenze.some((a) => a.includes("non modula")));
+  const idroPiccolo = dimensionaBiomassa({ risultatiAmbienti: casa.slice(1), comune: COMUNE, biomassa: { combustibile: "pellet", apparecchio: "stufa", distribuzione: "idro" } });
+  vero("un idro per 5 kW è sovradimensionato e lo si dice", idroPiccolo.sottoTagliaMinima && idroPiccolo.avvertenze.some((a) => a.includes("sovradimensionato")));
+  // Ad aria oltre 15 kW: il calore non arriva negli ambienti lontani.
+  const grande = dimensionaBiomassa({
+    risultatiAmbienti: [{ ambiente: { id: "g", nome: "Salone", tipoLocale: "soggiorno" }, invernaleKw: 18 }],
+    comune: COMUNE,
+    biomassa: { combustibile: "pellet", apparecchio: "stufa", distribuzione: "aria" },
+  });
+  vero("ad aria oltre 15 kW si suggerisce l'idro", grande.avvertenze.some((a) => a.includes("idro")));
+
+  // --- Requisiti di installazione ---
+  vero("installazione secondo UNI 10683", pellet.requisiti.some((q) => q.includes("UNI 10683")));
+  vero("canna fumaria secondo UNI EN 13384-1", pellet.requisiti.some((q) => q.includes("UNI EN 13384-1")));
+  vero("il pellet richiede una presa elettrica", pellet.requisiti.some((q) => q.includes("presa elettrica") || q.includes("Presa elettrica")));
+  vero("la legna no", !legna.requisiti.some((q) => q.toLowerCase().includes("presa elettrica")));
+
+  // --- Coerenza con il resto del motore ---
+  // Stessa formula delle ore equivalenti della pompa di calore: due formule
+  // diverse darebbero consumi annui diversi allo stesso edificio.
+  uguale("stesse ore equivalenti della pompa di calore", pellet.oreEquivalenti, oreEquivalentiRiscaldamento(COMUNE).ore, 1e-12);
+  uguale(
+    "il consumo della pompa di calore usa le stesse ore",
+    stimaConsumoAnnuoClimatizzazione({ totaleInvernaleKw: 6, totaleEstivoKw: 0, comune: COMUNE }).oreEquivalentiRiscaldamento,
+    oreEquivalentiRiscaldamento(COMUNE).ore,
+    1e-12
+  );
+
+  // --- Catalogo: nessun prodotto inventato, la ricerca va su richiesta ---
+  const ricerca = trovaGeneratoriBiomassaConsigliati({ combustibile: "pellet", apparecchio: "stufa", distribuzione: "aria", potenzaMinimaKw: 6, potenzaMassimaKw: 7.5 });
+  vero("stufe e camini: nessun prodotto proposto senza listino", ricerca.consigliati.length === 0 && ricerca.suRichiesta === true);
 }
 
 // ---------------------------------------------------------------------

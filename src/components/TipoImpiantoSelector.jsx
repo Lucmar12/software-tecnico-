@@ -2,12 +2,12 @@ import React from "react";
 
 /**
  * Selettore del tipo di impianto da dimensionare: climatizzazione
- * (condizionatori/pompe di calore) e/o acqua calda sanitaria
- * (bollitori/scaldacqua). Determina quali sezioni di input e di output
+ * (condizionatori/pompe di calore), stufe e camini a biomassa, acqua
+ * calda sanitaria, trattamento acque, pompe idrauliche. Determina quali sezioni di input e di output
  * vengono mostrate, per mantenere il flusso pertinente ed evitare di
  * chiedere/mostrare dati non necessari.
  */
-const CHIAVI_TIPO_IMPIANTO = ["climatizzazione", "acs", "trattamentoAcque", "pompeIdrauliche"];
+const CHIAVI_TIPO_IMPIANTO = ["climatizzazione", "biomassa", "acs", "trattamentoAcque", "pompeIdrauliche"];
 
 export default function TipoImpiantoSelector({ tipiImpianto, onChange }) {
   function toggle(chiave) {
@@ -25,6 +25,13 @@ export default function TipoImpiantoSelector({ tipiImpianto, onChange }) {
         titolo="Climatizzazione"
         descrizione="Condizionatori e pompe di calore — riscaldamento e/o raffrescamento ambienti"
         icona="❄️"
+      />
+      <Opzione
+        attivo={tipiImpianto.biomassa}
+        onClick={() => toggle("biomassa")}
+        titolo="Stufe e camini"
+        descrizione="A pellet o a legna, ad aria o collegati ai termosifoni — potenza, consumi e costo del combustibile"
+        icona="🔥"
       />
       <Opzione
         attivo={tipiImpianto.acs}

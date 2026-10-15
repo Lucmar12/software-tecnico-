@@ -7,7 +7,8 @@ export default function DisclaimerBox() {
       <strong className="text-slate-600">Disclaimer tecnico.</strong> Il calcolo è stato eseguito secondo
       metodologia UNI EN 12831 (carico invernale), metodo Carrier con dati climatici UNI 10339 (carico estivo),
       UNI 9182 (fabbisogno ACS, reti di distribuzione idrica e dimensionamento di autoclavi/pompe di sollevamento e
-      circolazione) e UNI EN 14743 (requisiti prestazionali degli addolcitori a scambio ionico). Le temperature di
+      circolazione), UNI EN 14743 (requisiti prestazionali degli addolcitori a scambio ionico) e, per stufe e
+      camini, UNI 10683 e UNI EN 13384-1, riportate come requisiti di installazione e non calcolate. Le temperature di
       progetto derivano da UNI 5364/UNI 10339 per i capoluoghi di provincia e per le principali città italiane ed
       umbre; per i comuni non elencati il valore è corretto per altitudine secondo il metodo UNI 10349. Per la
       progettazione esecutiva, il dimensionamento definitivo e l'accesso a detrazioni fiscali (Ecobonus, Conto
@@ -20,7 +21,8 @@ export default function DisclaimerBox() {
         puntuale dei giunti; affollamento convenzionale per destinazione d'uso; umidità specifica esterna media per
         l'Italia centrale al posto del bulbo umido del comune; gradi giorno rappresentativi della zona climatica
         anziché il valore tabellato del singolo comune; profili orari di irraggiamento e temperatura di forma
-        convenzionale, senza inerzia termica delle murature. Ogni coefficiente è esposto e modificabile
+        convenzionale, senza inerzia termica delle murature; per stufe e camini rendimento e potere calorifico di
+        riferimento, prezzo indicativo del combustibile e taglia minima di mercato come ordine di grandezza. Ogni coefficiente è esposto e modificabile
         nell'interfaccia: inserendo i dati reali il calcolo smette di essere convenzionale nel punto corrispondente.
         Prima dell'ordine dei materiali, confermare con un rilievo.
       </span>

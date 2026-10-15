@@ -14,6 +14,8 @@ import PompaCaloreAcsDettaglio from "./PompaCaloreAcsDettaglio.jsx";
 import AddolcitoreDettaglio from "./AddolcitoreDettaglio.jsx";
 import PompeIdraulicheDettaglio from "./PompeIdraulicheDettaglio.jsx";
 import RiepilogoSceltaProdotti from "./RiepilogoSceltaProdotti.jsx";
+import BiomassaDettaglio from "./BiomassaDettaglio.jsx";
+import { dimensionaBiomassa } from "../utils/biomassa.js";
 import { calcolaBollitore, ZONE_CLIMATICHE } from "../data/calculations.js";
 import { trovaBollitoriConsigliati } from "../data/catalogo.js";
 import { stimaConsumoAnnuoClimatizzazione } from "../utils/fotovoltaico.js";
@@ -37,8 +39,12 @@ const EDIFICIO_VUOTO = {
  * preventivo in primo piano. Mostra solo i blocchi (climatizzazione, ACS,
  * trattamento acque, pompe idrauliche) effettivamente richiesti.
  */
-export default function RelazioneCalcolo({ scenari, scenarioProgetto, comune, acs, branding, tipiImpianto, sistemaCentralizzato, solareTermico, fotovoltaico, trattamentoAcque, pompeIdrauliche }) {
+export default function RelazioneCalcolo({ scenari, scenarioProgetto, comune, acs, branding, tipiImpianto, sistemaCentralizzato, solareTermico, fotovoltaico, trattamentoAcque, pompeIdrauliche, biomassa }) {
   const mostraClima = tipiImpianto.climatizzazione;
+  const mostraBiomassa = Boolean(tipiImpianto.biomassa && biomassa);
+  // Il calcolo per ambiente serve a entrambe: la stufa parte dallo stesso
+  // carico invernale dei climatizzatori.
+  const mostraAmbienti = mostraClima || mostraBiomassa;
   const mostraAcs = tipiImpianto.acs;
   const mostraTrattamentoAcque = tipiImpianto.trattamentoAcque;
   const mostraPompeIdrauliche = tipiImpianto.pompeIdrauliche;
@@ -59,6 +65,7 @@ export default function RelazioneCalcolo({ scenari, scenarioProgetto, comune, ac
     fotovoltaico,
     trattamentoAcque,
     pompeIdrauliche,
+    biomassa,
   });
 
   // Ogni scheda è un blocco di JSX: raggruppa le sezioni che rispondono
@@ -69,12 +76,12 @@ export default function RelazioneCalcolo({ scenari, scenarioProgetto, comune, ac
     <>
       <RiepilogoSceltaProdotti
         voci={vociRiepilogo}
-        nomeScenario={mostraClima && confrontoAttivo ? scenarioDaPreventivare?.nome : null}
+        nomeScenario={mostraAmbienti && confrontoAttivo ? scenarioDaPreventivare?.nome : null}
       />
       <div className="no-print">
         <RichiediPreventivo
           prodottiConsigliati={prodottiSelezionabiliDaVoci(vociRiepilogo)}
-          edificio={mostraClima && scenarioDaPreventivare ? scenarioDaPreventivare.edificio : EDIFICIO_VUOTO}
+          edificio={mostraAmbienti && scenarioDaPreventivare ? scenarioDaPreventivare.edificio : EDIFICIO_VUOTO}
           comune={comune}
           branding={branding}
           evidenziato={true}
@@ -148,13 +155,16 @@ export default function RelazioneCalcolo({ scenari, scenarioProgetto, comune, ac
             <FotovoltaicoDettaglio edificio={scenario.edificio} comune={comune} fotovoltaico={fotovoltaico} />
           </section>
         ))}
+      {mostraBiomassa && scenarioDaPreventivare && (
+        <NumeriBiomassa edificio={scenarioDaPreventivare.edificio} comune={comune} biomassa={biomassa} />
+      )}
       {mostraAcs && <SolareTermicoDettaglio acs={acs} solareTermico={solareTermico} />}
     </>
   );
 
   const schedaComeCalcolato = (
     <>
-      {mostraClima &&
+      {mostraAmbienti &&
         scenari.map((scenario) => {
           const mostraSplit = sistemaCentralizzato.tipo === "nessuno" || scenario.edificio.risultatiAmbienti.length < 2;
           return (
@@ -166,11 +176,22 @@ export default function RelazioneCalcolo({ scenari, scenarioProgetto, comune, ac
                   <DettaglioCalcolo key={r.ambiente.id} risultato={r} comune={comune} defaultOpen={true} mostraBtu={mostraSplit} />
                 ))}
               </div>
-              <VRFDettaglio risultatiAmbienti={scenario.edificio.risultatiAmbienti} sistemaCentralizzato={sistemaCentralizzato} comune={comune} mostraCatalogo={false} />
-              <ChillerDettaglio risultatiAmbienti={scenario.edificio.risultatiAmbienti} sistemaCentralizzato={sistemaCentralizzato} comune={comune} mostraCatalogo={false} />
+              {mostraClima && (
+                <>
+                  <VRFDettaglio risultatiAmbienti={scenario.edificio.risultatiAmbienti} sistemaCentralizzato={sistemaCentralizzato} comune={comune} mostraCatalogo={false} />
+                  <ChillerDettaglio risultatiAmbienti={scenario.edificio.risultatiAmbienti} sistemaCentralizzato={sistemaCentralizzato} comune={comune} mostraCatalogo={false} />
+                </>
+              )}
             </section>
           );
         })}
+
+      {/* La stufa si dimensiona sulla situazione da realizzare, come il resto della proposta. */}
+      {mostraBiomassa && scenarioDaPreventivare && (
+        <section className="print-break">
+          <BiomassaDettaglio edificio={scenarioDaPreventivare.edificio} comune={comune} biomassa={biomassa} />
+        </section>
+      )}
 
       {mostraAcs && (
         <section className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
@@ -263,6 +284,41 @@ export default function RelazioneCalcolo({ scenari, scenarioProgetto, comune, ac
 
       <FooterBranding nomeAzienda={branding.nomeAzienda} />
     </div>
+  );
+}
+
+/**
+ * I numeri della stufa che il cliente guarda per primi: quanto
+ * combustibile serve in un anno e quanto costa. Il dettaglio di come ci
+ * si arriva sta nella scheda del calcolo.
+ */
+function NumeriBiomassa({ edificio, comune, biomassa }) {
+  const r = dimensionaBiomassa({ risultatiAmbienti: edificio.risultatiAmbienti, comune, biomassa });
+  const unita = r.combustibile.unitaVendita;
+  return (
+    <section className="space-y-3">
+      <h2 className="text-xl font-bold text-slate-800">Stufa o camino</h2>
+      <div className="grid sm:grid-cols-3 gap-3">
+        <RiepilogoCard
+          accento="invernale"
+          label="Potenza nominale da cercare"
+          value={r.sottoTagliaMinima ? `circa ${r.tagliaMinimaKw} kW` : `${r.potenzaMinimaKw.toFixed(1)}–${r.potenzaMassimaKw.toFixed(1)} kW`}
+          sotto={`per ${r.ambientiServiti.map((a) => a.nome).join(", ")}`}
+        />
+        <RiepilogoCard
+          accento="superficie"
+          label={`${r.combustibile.etichetta} in un anno`}
+          value={`${Math.round(r.unitaAnno)} ${unita.plurale}`}
+          sotto={`${Math.round(r.combustibileAnnuoKg).toLocaleString("it-IT")} kg, ${unita.nome} da ${unita.kg} kg`}
+        />
+        <RiepilogoCard
+          accento="co2"
+          label="Costo del combustibile"
+          value={`${Math.round(r.costoAnnuo).toLocaleString("it-IT")} €/anno`}
+          sotto={`a ${r.prezzoUnita.toLocaleString("it-IT", { minimumFractionDigits: 2 })} € al ${unita.nome}`}
+        />
+      </div>
+    </section>
   );
 }
 

@@ -358,6 +358,35 @@ export function trovaPompeConsigliate(tipo, portataMcRichiesta, prevalenzaMRichi
 }
 
 /** Individua gli impianti fotovoltaici a catalogo idonei a coprire una data taglia richiesta [kWp], stessa logica di margine +25% max. */
+/**
+ * Stufe e camini. La categoria non ha ancora un listino: la ricerca
+ * risponde "su richiesta" finché non arriva, e a quel punto basterà
+ * aggiungere i prodotti con tipo "generatore_biomassa" e i campi
+ * combustibile, apparecchio e distribuzione.
+ *
+ * La potenza va confrontata con l'intervallo calcolato, non solo con un
+ * minimo: una stufa a legna troppo grande lavora male quanto una troppo
+ * piccola.
+ */
+export function trovaGeneratoriBiomassaConsigliati({ combustibile, apparecchio, distribuzione, potenzaMinimaKw, potenzaMassimaKw }) {
+  const suRichiesta = risultatoSuRichiesta("generatore_biomassa");
+  if (suRichiesta) return suRichiesta;
+  const candidati = CATALOGO_PRODOTTI.filter(
+    (p) =>
+      p.tipo === "generatore_biomassa" &&
+      p.combustibile === combustibile &&
+      p.apparecchio === apparecchio &&
+      p.distribuzione === distribuzione &&
+      p.potenzaKw >= potenzaMinimaKw &&
+      p.potenzaKw <= potenzaMassimaKw
+  );
+  candidati.sort((a, b) => a.prezzoIndicativoMin - b.prezzoIndicativoMin);
+  if (candidati.length === 0) {
+    return { consigliati: [], messaggio: "Nessun apparecchio a catalogo cade in questo intervallo di potenza — contattaci per una soluzione su misura" };
+  }
+  return { consigliati: candidati.slice(0, 3), messaggio: null };
+}
+
 export function trovaFotovoltaicoConsigliati(kWpRichiesti) {
   const suRichiesta = risultatoSuRichiesta("fotovoltaico");
   if (suRichiesta) return suRichiesta;

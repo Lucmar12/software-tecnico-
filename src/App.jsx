@@ -15,6 +15,8 @@ import FotovoltaicoPanel from "./components/FotovoltaicoPanel.jsx";
 import ProgettiPanel from "./components/ProgettiPanel.jsx";
 import StoricoRichieste from "./components/StoricoRichieste.jsx";
 import StepHeader from "./components/StepHeader.jsx";
+import BiomassaForm from "./components/BiomassaForm.jsx";
+import { nuovaBiomassa } from "./utils/biomassa.js";
 import { BRANDING_FISSO } from "./utils/brandingFisso.js";
 import { nuovoScenario, nuovoTrattamentoAcque, nuovaPompeIdrauliche } from "./utils/modelli.js";
 import { ambienteValido } from "./utils/validazione.js";
@@ -24,7 +26,7 @@ import { caricaBozza, salvaBozza } from "./utils/persistenza.js";
 import { applicaStime } from "./utils/stime.js";
 
 const STATO_INIZIALE = {
-  tipiImpianto: { climatizzazione: true, acs: true, trattamentoAcque: false, pompeIdrauliche: false },
+  tipiImpianto: { climatizzazione: true, biomassa: false, acs: true, trattamentoAcque: false, pompeIdrauliche: false },
   comune: null,
   scenari: [nuovoScenario("Stato di fatto")],
   scenarioAttivoId: null,
@@ -36,6 +38,7 @@ const STATO_INIZIALE = {
   fotovoltaico: { attivo: false, kWp: 4, conAccumulo: false },
   trattamentoAcque: nuovoTrattamentoAcque(),
   pompeIdrauliche: nuovaPompeIdrauliche(),
+  biomassa: nuovaBiomassa(),
 };
 STATO_INIZIALE.scenarioAttivoId = STATO_INIZIALE.scenari[0].id;
 STATO_INIZIALE.scenarioProgettoId = STATO_INIZIALE.scenari[0].id;
@@ -62,6 +65,7 @@ function fondiConDefault(statoCaricato) {
     solareTermico: { ...STATO_INIZIALE.solareTermico, ...(statoCaricato.solareTermico || {}) },
     fotovoltaico: { ...STATO_INIZIALE.fotovoltaico, ...(statoCaricato.fotovoltaico || {}) },
     trattamentoAcque: { ...STATO_INIZIALE.trattamentoAcque, ...(statoCaricato.trattamentoAcque || {}) },
+    biomassa: { ...STATO_INIZIALE.biomassa, ...(statoCaricato.biomassa || {}) },
     pompeIdrauliche: {
       ...STATO_INIZIALE.pompeIdrauliche,
       ...(statoCaricato.pompeIdrauliche || {}),
@@ -116,6 +120,7 @@ export default function App() {
   const [fotovoltaico, setFotovoltaico] = useState(iniziale.fotovoltaico);
   const [trattamentoAcque, setTrattamentoAcque] = useState(iniziale.trattamentoAcque);
   const [pompeIdrauliche, setPompeIdrauliche] = useState(iniziale.pompeIdrauliche);
+  const [biomassa, setBiomassa] = useState(iniziale.biomassa);
   const [progettoAttivoId, setProgettoAttivoId] = useState(null);
 
   const statoCompleto = {
@@ -130,13 +135,14 @@ export default function App() {
     fotovoltaico,
     trattamentoAcque,
     pompeIdrauliche,
+    biomassa,
   };
 
   // Bozza automatica: salvata ad ogni modifica di stato rilevante, ripristinata all'apertura dell'app.
   useEffect(() => {
     salvaBozza(statoCompleto);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tipiImpianto, comune, scenari, scenarioAttivoId, scenarioProgettoId, acs, sistemaCentralizzato, solareTermico, fotovoltaico, trattamentoAcque, pompeIdrauliche]);
+  }, [tipiImpianto, comune, scenari, scenarioAttivoId, scenarioProgettoId, acs, sistemaCentralizzato, solareTermico, fotovoltaico, trattamentoAcque, pompeIdrauliche, biomassa]);
 
   function caricaProgetto(progettoSalvato) {
     const s = fondiConDefault(progettoSalvato.stato);
@@ -151,6 +157,7 @@ export default function App() {
     setFotovoltaico(s.fotovoltaico);
     setTrattamentoAcque(s.trattamentoAcque);
     setPompeIdrauliche(s.pompeIdrauliche);
+    setBiomassa(s.biomassa);
     setProgettoAttivoId(progettoSalvato.id);
   }
 
@@ -169,21 +176,24 @@ export default function App() {
     (!pompeIdrauliche.sollevamento.attivo || pompeIdrauliche.sollevamento.portataMc > 0) &&
     (!pompeIdrauliche.circolazione.attivo || pompeIdrauliche.circolazione.lunghezzaTubazioniM > 0);
 
-  const climatizzazioneOk = !tipiImpianto.climatizzazione || (Boolean(comune) && ambientiValidi);
+  // Comune e ambienti servono sia alla climatizzazione sia a stufe e camini:
+  // entrambi partono dal carico invernale degli stessi locali.
+  const servonoAmbienti = tipiImpianto.climatizzazione || tipiImpianto.biomassa;
+  const climatizzazioneOk = !servonoAmbienti || (Boolean(comune) && ambientiValidi);
   const acsOk = !tipiImpianto.acs || acsValido;
   const trattamentoAcqueOk = !tipiImpianto.trattamentoAcque || trattamentoAcqueValido;
   const pompeIdraulicheOk = !tipiImpianto.pompeIdrauliche || pompeIdraulicheValide;
   const pronto = climatizzazioneOk && acsOk && trattamentoAcqueOk && pompeIdraulicheOk;
 
-  // Calcolo edificio per ogni scenario, solo se la climatizzazione è richiesta e il comune è selezionato.
+  // Calcolo edificio per ogni scenario, quando serve il carico degli ambienti e il comune è selezionato.
   const scenariCalcolati = useMemo(() => {
-    if (!tipiImpianto.climatizzazione || !comune) return [];
+    if (!servonoAmbienti || !comune) return [];
     return scenari
       .filter((s) => s.ambienti.length > 0 && s.ambienti.every(ambienteValido))
       .map((s) => ({ ...s, edificio: calcolaEdificioConOverride(s.ambienti, comune) }));
-  }, [scenari, comune, tipiImpianto.climatizzazione]);
+  }, [scenari, comune, servonoAmbienti]);
 
-  const climatizzazionePronta = !tipiImpianto.climatizzazione || scenariCalcolati.length > 0;
+  const climatizzazionePronta = !servonoAmbienti || scenariCalcolati.length > 0;
 
   // Edificio calcolato dello scenario che si sta compilando: serve al
   // confronto mono/multi, che va mostrato accanto alla scelta e non dopo.
@@ -201,9 +211,10 @@ export default function App() {
   // Numerazione dinamica delle sezioni di input, in base a cosa è effettivamente mostrato.
   let numeroSezione = 0;
   const prossimoNumero = () => ++numeroSezione;
-  const nComune = tipiImpianto.climatizzazione ? prossimoNumero() : null;
-  const nScenari = tipiImpianto.climatizzazione ? prossimoNumero() : null;
-  const nAmbienti = tipiImpianto.climatizzazione ? prossimoNumero() : null;
+  const nComune = servonoAmbienti ? prossimoNumero() : null;
+  const nScenari = servonoAmbienti ? prossimoNumero() : null;
+  const nAmbienti = servonoAmbienti ? prossimoNumero() : null;
+  const nBiomassa = tipiImpianto.biomassa ? prossimoNumero() : null;
   const nAcs = tipiImpianto.acs ? prossimoNumero() : null;
   const nTrattamentoAcque = tipiImpianto.trattamentoAcque ? prossimoNumero() : null;
   const nPompeIdrauliche = tipiImpianto.pompeIdrauliche ? prossimoNumero() : null;
@@ -215,8 +226,8 @@ export default function App() {
    * metà del lavoro.
    */
   const mancanze = [
-    tipiImpianto.climatizzazione && !comune && { id: "sezione-comune", testo: "Seleziona il comune per ricavare i dati climatici di progetto" },
-    tipiImpianto.climatizzazione && Boolean(comune) && !ambientiValidi && { id: "sezione-ambienti", testo: "Completa correttamente almeno un ambiente" },
+    servonoAmbienti && !comune && { id: "sezione-comune", testo: "Seleziona il comune per ricavare i dati climatici di progetto" },
+    servonoAmbienti && Boolean(comune) && !ambientiValidi && { id: "sezione-ambienti", testo: "Completa correttamente almeno un ambiente" },
     tipiImpianto.acs && !acsOk && { id: "sezione-acs", testo: "Inserisci il numero di persone servite dall'acqua calda sanitaria" },
     tipiImpianto.trattamentoAcque && !trattamentoAcqueOk && { id: "sezione-trattamento-acque", testo: "Inserisci numero di persone e durezza dell'acqua per l'addolcitore" },
     tipiImpianto.pompeIdrauliche && !pompeIdraulicheOk && { id: "sezione-pompe-idrauliche", testo: "Completa i dati dell'autoclave e delle pompe attivate" },
@@ -226,7 +237,10 @@ export default function App() {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  const mostraRisultati = pronto && climatizzazionePronta && (tipiImpianto.climatizzazione || tipiImpianto.acs || tipiImpianto.trattamentoAcque || tipiImpianto.pompeIdrauliche);
+  const mostraRisultati =
+    pronto &&
+    climatizzazionePronta &&
+    (tipiImpianto.climatizzazione || tipiImpianto.biomassa || tipiImpianto.acs || tipiImpianto.trattamentoAcque || tipiImpianto.pompeIdrauliche);
 
   return (
     <div className="min-h-screen">
@@ -253,7 +267,7 @@ export default function App() {
           />
         </section>
 
-        {tipiImpianto.climatizzazione ? (
+        {servonoAmbienti ? (
           <section id="sezione-comune" className="bg-white border border-slate-200 rounded-xl p-4 space-y-3 no-print">
             <StepHeader numero={nComune} titolo="Comune e dati climatici" />
             <ComuneSelector comuneEffettivo={comune} onChange={setComune} />
@@ -263,11 +277,11 @@ export default function App() {
             onClick={() => setTipiImpianto({ ...tipiImpianto, climatizzazione: true })}
             className="w-full text-left bg-slate-50 border border-dashed border-slate-300 rounded-xl p-4 text-sm text-slate-500 hover:border-brand-400 hover:text-brand-700 no-print transition-colors"
           >
-            Climatizzazione disattivata per questo progetto — <span className="underline">tocca per riattivarla</span>
+            Climatizzazione e stufe disattivate per questo progetto — <span className="underline">tocca per riattivare la climatizzazione</span>
           </button>
         )}
 
-        {tipiImpianto.climatizzazione && (
+        {servonoAmbienti && (
           <section className="bg-white border border-slate-200 rounded-xl p-4 space-y-3 no-print">
             <StepHeader
               numero={nScenari}
@@ -285,7 +299,7 @@ export default function App() {
           </section>
         )}
 
-        {tipiImpianto.climatizzazione && (
+        {servonoAmbienti && (
           <section id="sezione-ambienti" className="space-y-3 no-print">
             <StepHeader numero={nAmbienti} titolo={`Ambienti — ${scenarioAttivo.nome}`} />
             <AmbientiTabella
@@ -293,13 +307,31 @@ export default function App() {
               comune={comune}
               onChange={(ambienti) => aggiornaAmbientiScenario(scenarioAttivo.id, ambienti)}
             />
-            <SistemaCentralizzatoPanel
-              sistemaCentralizzato={sistemaCentralizzato}
-              onChange={setSistemaCentralizzato}
-              numeroAmbienti={scenarioAttivo.ambienti.length}
+            {tipiImpianto.climatizzazione && (
+              <>
+                <SistemaCentralizzatoPanel
+                  sistemaCentralizzato={sistemaCentralizzato}
+                  onChange={setSistemaCentralizzato}
+                  numeroAmbienti={scenarioAttivo.ambienti.length}
+                  edificio={edificioAttivo}
+                />
+                <FotovoltaicoPanel fotovoltaico={fotovoltaico} onChange={setFotovoltaico} />
+              </>
+            )}
+          </section>
+        )}
+
+        {tipiImpianto.biomassa && (
+          <section id="sezione-biomassa" className="space-y-3 no-print">
+            <StepHeader numero={nBiomassa} titolo="Stufa o camino" sottotitolo="a pellet o a legna, ad aria o collegato ai termosifoni" />
+            <BiomassaForm
+              biomassa={biomassa}
+              onChange={setBiomassa}
+              ambienti={scenarioAttivo.ambienti}
+              onChangeAmbienti={(ambienti) => aggiornaAmbientiScenario(scenarioAttivo.id, ambienti)}
               edificio={edificioAttivo}
+              comune={comune}
             />
-            <FotovoltaicoPanel fotovoltaico={fotovoltaico} onChange={setFotovoltaico} />
           </section>
         )}
 
@@ -366,6 +398,7 @@ export default function App() {
                 fotovoltaico={fotovoltaico}
                 trattamentoAcque={trattamentoAcque}
                 pompeIdrauliche={pompeIdrauliche}
+                biomassa={biomassa}
               />
             </div>
           </section>

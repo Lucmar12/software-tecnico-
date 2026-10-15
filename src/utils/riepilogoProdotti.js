@@ -10,6 +10,7 @@
  */
 import { calcolaBollitore } from "../data/calculations.js";
 import {
+  trovaGeneratoriBiomassaConsigliati,
   trovaAlternativeDiGamma,
   trovaProdottiConsigliati,
   trovaBollitoriConsigliati,
@@ -20,6 +21,7 @@ import {
   trovaScaldacquaPdCConsigliati,
 } from "../data/catalogo.js";
 import { calcolaDimensionamentoVRF } from "./vrf.js";
+import { dimensionaBiomassa, descrizioneApparecchio } from "./biomassa.js";
 import { calcolaDimensionamentoChiller } from "./chiller.js";
 import { calcolaAddolcitore } from "./addolcitore.js";
 import { calcolaAutoclave, calcolaSollevamento, calcolaCircolazione } from "./pompeIdrauliche.js";
@@ -35,7 +37,7 @@ import {
   specificaPompa,
 } from "./specificheProdotto.js";
 
-function voceDaRisultato(chiave, icona, titolo, { consigliati, messaggio, suRichiesta = false }, specificaFn, alternativeGamma = []) {
+function voceDaRisultato(chiave, icona, titolo, { consigliati, messaggio, suRichiesta = false }, specificaFn, alternativeGamma = [], specificaRichiesta = null) {
   const prodotto = consigliati[0] || null;
   return {
     chiave,
@@ -47,6 +49,9 @@ function voceDaRisultato(chiave, icona, titolo, { consigliati, messaggio, suRich
     specifica: prodotto ? specificaFn(prodotto) : null,
     messaggio,
     suRichiesta,
+    // Cosa chiedere quando il prodotto è su richiesta: la specifica calcolata
+    // (es. "Stufa a pellet ad aria · 5,4–6,7 kW") rende la richiesta precisa.
+    specificaRichiesta,
   };
 }
 
@@ -60,8 +65,20 @@ function voceDaRisultato(chiave, icona, titolo, { consigliati, messaggio, suRich
  *   primo/unico rilevante per il riepilogo prodotto — con più scenari a
  *   confronto la proposta commerciale si basa su quello attivo).
  */
-export function calcolaVociRiepilogoProdotti({ tipiImpianto, scenario, comune, acs, sistemaCentralizzato, solareTermico, fotovoltaico, trattamentoAcque, pompeIdrauliche }) {
+export function calcolaVociRiepilogoProdotti({ tipiImpianto, scenario, comune, acs, sistemaCentralizzato, solareTermico, fotovoltaico, trattamentoAcque, pompeIdrauliche, biomassa }) {
   const voci = [];
+
+  if (tipiImpianto.biomassa && scenario && comune) {
+    const r = dimensionaBiomassa({ risultatiAmbienti: scenario.edificio.risultatiAmbienti, comune, biomassa });
+    const ricerca = trovaGeneratoriBiomassaConsigliati({
+      combustibile: r.config.combustibile,
+      apparecchio: r.config.apparecchio,
+      distribuzione: r.config.distribuzione,
+      potenzaMinimaKw: r.potenzaMinimaKw,
+      potenzaMassimaKw: r.potenzaMassimaKw,
+    });
+    voci.push(voceDaRisultato("biomassa", "🔥", "Stufa o camino", ricerca, () => "", [], descrizioneApparecchio(r)));
+  }
 
   if (tipiImpianto.climatizzazione && scenario) {
     const edificio = scenario.edificio;

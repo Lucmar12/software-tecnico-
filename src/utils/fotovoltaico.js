@@ -34,6 +34,35 @@ const ORE_RAFFRESCAMENTO_PER_ZONA = { A: 600, B: 550, C: 450, D: 400, E: 300, F:
 const QUOTA_COPERTA_DALL_IMPIANTO = 0.75;
 
 /**
+ * ORE EQUIVALENTI A PIENO CARICO IN RISCALDAMENTO, metodo dei gradi giorno.
+ *
+ * Il carico di progetto si verifica solo al giorno più freddo: usarlo per
+ * tutte le ore di esercizio sovrastimerebbe il consumo. Il fabbisogno
+ * annuo si ricava invece dal coefficiente di dispersione dell'edificio
+ * H = P_progetto / ΔT_progetto moltiplicato per i gradi giorno:
+ *
+ *   Q = H × GG × 24  →  ore equivalenti = GG × 24 / ΔT_progetto
+ *
+ * al netto della quota coperta dagli apporti gratuiti. Così il consumo
+ * dipende davvero dal clima del comune scelto — dai suoi gradi giorno e
+ * dalla sua temperatura di progetto — e non da un numero fisso per zona.
+ *
+ * Unica per tutta l'applicazione: la usano la pompa di calore e i
+ * generatori a biomassa. Due formule separate per la stessa grandezza
+ * finirebbero per dare consumi annui diversi allo stesso edificio.
+ */
+export function oreEquivalentiRiscaldamento(comune) {
+  const zona = ZONE_CLIMATICHE[comune.zona];
+  const deltaTProgetto = Math.max(1, TEMP_INTERNA_PROGETTO - comune.teInv);
+  return {
+    gradiGiorno: zona.gradiGiorno,
+    deltaTProgetto,
+    quotaCopertaDallImpianto: QUOTA_COPERTA_DALL_IMPIANTO,
+    ore: ((zona.gradiGiorno * 24) / deltaTProgetto) * QUOTA_COPERTA_DALL_IMPIANTO,
+  };
+}
+
+/**
  * Stima il consumo elettrico annuo complessivo dell'impianto di
  * climatizzazione dimensionato (riscaldamento + raffrescamento), usando
  * l'efficienza di una classe energetica rappresentativa come riferimento
@@ -42,29 +71,12 @@ const QUOTA_COPERTA_DALL_IMPIANTO = 0.75;
  */
 export function stimaConsumoAnnuoClimatizzazione({ totaleInvernaleKw, totaleEstivoKw, comune, classeRappresentativa = "A++" }) {
   const efficienza = EFFICIENZA_PER_CLASSE[classeRappresentativa];
-  const zona = ZONE_CLIMATICHE[comune.zona];
-
-  /*
-   * ORE EQUIVALENTI A PIENO CARICO, metodo dei gradi giorno.
-   *
-   * Il carico di progetto si verifica solo al giorno più freddo: usarlo
-   * per tutte le ore di esercizio sovrastimerebbe il consumo. Il
-   * fabbisogno annuo si ricava invece dal coefficiente di dispersione
-   * dell'edificio H = P_progetto / ΔT_progetto moltiplicato per i gradi
-   * giorno:
-   *
-   *   Q = H × GG × 24  →  ore equivalenti = GG × 24 / ΔT_progetto
-   *
-   * Così il consumo dipende davvero dal clima del comune scelto — dai
-   * suoi gradi giorno e dalla sua temperatura di progetto — e non da un
-   * numero fisso per zona.
-   */
-  const deltaTProgetto = Math.max(1, TEMP_INTERNA_PROGETTO - comune.teInv);
-  const gradiGiorno = zona.gradiGiorno;
-  const oreEquivalentiRiscaldamento = ((gradiGiorno * 24) / deltaTProgetto) * QUOTA_COPERTA_DALL_IMPIANTO;
+  const riscaldamento = oreEquivalentiRiscaldamento(comune);
+  const { gradiGiorno, deltaTProgetto } = riscaldamento;
+  const oreRiscaldamento = riscaldamento.ore;
   const oreEquivalentiRaffrescamento = ORE_RAFFRESCAMENTO_PER_ZONA[comune.zona] ?? 400;
 
-  const consumoRiscaldamentoKwh = calcolaConsumoAnnuo(totaleInvernaleKw, oreEquivalentiRiscaldamento, efficienza, "riscaldamento");
+  const consumoRiscaldamentoKwh = calcolaConsumoAnnuo(totaleInvernaleKw, oreRiscaldamento, efficienza, "riscaldamento");
   const consumoRaffrescamentoKwh = calcolaConsumoAnnuo(totaleEstivoKw, oreEquivalentiRaffrescamento, efficienza, "raffrescamento");
 
   return {
@@ -74,7 +86,7 @@ export function stimaConsumoAnnuoClimatizzazione({ totaleInvernaleKw, totaleEsti
     classeRappresentativa,
     gradiGiorno,
     deltaTProgetto,
-    oreEquivalentiRiscaldamento,
+    oreEquivalentiRiscaldamento: oreRiscaldamento,
     oreEquivalentiRaffrescamento,
     quotaCopertaDallImpianto: QUOTA_COPERTA_DALL_IMPIANTO,
   };
