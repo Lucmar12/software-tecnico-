@@ -16,6 +16,7 @@ import PompeIdraulicheDettaglio from "./PompeIdraulicheDettaglio.jsx";
 import RiepilogoSceltaProdotti from "./RiepilogoSceltaProdotti.jsx";
 import BiomassaDettaglio from "./BiomassaDettaglio.jsx";
 import { dimensionaBiomassa } from "../utils/biomassa.js";
+import { profiloCompilato } from "../utils/profiloProfessionista.js";
 import { calcolaBollitore, ZONE_CLIMATICHE } from "../data/calculations.js";
 import { trovaBollitoriConsigliati } from "../data/catalogo.js";
 import { stimaConsumoAnnuoClimatizzazione } from "../utils/fotovoltaico.js";
@@ -39,7 +40,7 @@ const EDIFICIO_VUOTO = {
  * preventivo in primo piano. Mostra solo i blocchi (climatizzazione, ACS,
  * trattamento acque, pompe idrauliche) effettivamente richiesti.
  */
-export default function RelazioneCalcolo({ scenari, scenarioProgetto, comune, acs, branding, tipiImpianto, sistemaCentralizzato, solareTermico, fotovoltaico, trattamentoAcque, pompeIdrauliche, biomassa }) {
+export default function RelazioneCalcolo({ scenari, scenarioProgetto, comune, acs, branding, tipiImpianto, sistemaCentralizzato, solareTermico, fotovoltaico, trattamentoAcque, pompeIdrauliche, biomassa, profilo = null }) {
   const mostraClima = tipiImpianto.climatizzazione;
   const mostraBiomassa = Boolean(tipiImpianto.biomassa && biomassa);
   // Il calcolo per ambiente serve a entrambe: la stufa parte dallo stesso
@@ -84,6 +85,7 @@ export default function RelazioneCalcolo({ scenari, scenarioProgetto, comune, ac
           edificio={mostraAmbienti && scenarioDaPreventivare ? scenarioDaPreventivare.edificio : EDIFICIO_VUOTO}
           comune={comune}
           branding={branding}
+          profilo={profilo}
           evidenziato={true}
         />
       </div>
@@ -278,11 +280,17 @@ export default function RelazioneCalcolo({ scenari, scenarioProgetto, comune, ac
         </button>
       </div>
 
-      <IntestazioneStampa branding={branding} comune={comune} titolo="Relazione di calcolo" sottotitolo="Dimensionamento impianto residenziale" />
+      <IntestazioneStampa
+        branding={branding}
+        comune={comune}
+        profilo={profilo}
+        titolo="Relazione di calcolo"
+        sottotitolo="Dimensionamento impianto residenziale"
+      />
 
       <Schede schede={schede} />
 
-      <FooterBranding nomeAzienda={branding.nomeAzienda} />
+      <FooterBranding nomeAzienda={branding.nomeAzienda} nomeProfessionista={profiloCompilato(profilo) ? profilo.nome : null} />
     </div>
   );
 }

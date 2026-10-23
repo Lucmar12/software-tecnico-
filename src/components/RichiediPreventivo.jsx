@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { validaLead } from "../utils/validazione.js";
 import { generaRiepilogoTesto, generaMailtoLink, generaWhatsAppLink, copiaNegliAppunti, formattaEuro } from "../utils/export.js";
 import { registraRichiestaStorico } from "../utils/persistenza.js";
@@ -15,8 +15,29 @@ const EMAIL_SUPPORTO_PLACEHOLDER = "supporto-tecnico@azienda-esempio.it";
  * WhatsApp o copiabile negli appunti. Ogni invio viene registrato nello
  * storico locale del dispositivo (non una dashboard multi-installatore).
  */
-export default function RichiediPreventivo({ prodottiConsigliati, edificio, comune, branding, evidenziato }) {
-  const [lead, setLead] = useState({ nomeAzienda: "", clienteFinale: "", email: "", telefono: "", note: "" });
+export default function RichiediPreventivo({ prodottiConsigliati, edificio, comune, branding, evidenziato, profilo = null }) {
+  // Un professionista che ha già inserito i propri dati non deve ridigitarli
+  // a ogni richiesta: il modulo parte da quelli, e restano modificabili.
+  const [lead, setLead] = useState(() => ({
+    nomeAzienda: profilo?.nome || "",
+    clienteFinale: "",
+    email: profilo?.email || "",
+    telefono: profilo?.telefono || "",
+    note: "",
+  }));
+
+  // Il professionista spesso si firma dopo aver visto i risultati, quando il
+  // modulo esiste già: i suoi dati riempiono i campi ancora vuoti, senza
+  // toccare quelli che ha già scritto.
+  useEffect(() => {
+    if (!profilo) return;
+    setLead((l) => ({
+      ...l,
+      nomeAzienda: l.nomeAzienda || profilo.nome || "",
+      email: l.email || profilo.email || "",
+      telefono: l.telefono || profilo.telefono || "",
+    }));
+  }, [profilo]);
   const [selezionati, setSelezionati] = useState(() => new Set(prodottiConsigliati.slice(0, 1).map((p) => `${p.marchio}|${p.modello}`)));
   const [prioritaria, setPrioritaria] = useState(false);
   const [inviato, setInviato] = useState(false);

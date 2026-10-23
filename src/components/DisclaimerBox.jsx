@@ -30,10 +30,12 @@ export default function DisclaimerBox() {
   );
 }
 
-export function FooterBranding({ nomeAzienda }) {
+export function FooterBranding({ nomeAzienda, nomeProfessionista = null }) {
   return (
     <footer className="text-center text-xs text-slate-400 py-6">
-      Dimensionamento realizzato con {nomeAzienda || "[nome azienda]"}
+      {nomeProfessionista
+        ? `Relazione predisposta da ${nomeProfessionista} con il supporto tecnico di ${nomeAzienda}`
+        : `Dimensionamento realizzato con ${nomeAzienda || "[nome azienda]"}`}
     </footer>
   );
 }

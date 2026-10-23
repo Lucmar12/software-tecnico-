@@ -16,6 +16,8 @@ import ProgettiPanel from "./components/ProgettiPanel.jsx";
 import StoricoRichieste from "./components/StoricoRichieste.jsx";
 import StepHeader from "./components/StepHeader.jsx";
 import BiomassaForm from "./components/BiomassaForm.jsx";
+import ProfiloProfessionistaPanel from "./components/ProfiloProfessionistaPanel.jsx";
+import { caricaProfilo } from "./utils/profiloProfessionista.js";
 import { nuovaBiomassa } from "./utils/biomassa.js";
 import { BRANDING_FISSO } from "./utils/brandingFisso.js";
 import { nuovoScenario, nuovoTrattamentoAcque, nuovaPompeIdrauliche } from "./utils/modelli.js";
@@ -122,6 +124,9 @@ export default function App() {
   const [pompeIdrauliche, setPompeIdrauliche] = useState(iniziale.pompeIdrauliche);
   const [biomassa, setBiomassa] = useState(iniziale.biomassa);
   const [progettoAttivoId, setProgettoAttivoId] = useState(null);
+  // Dati di chi firma la relazione: del dispositivo, non del progetto, quindi
+  // fuori da statoCompleto e dalla bozza.
+  const [profilo, setProfilo] = useState(() => caricaProfilo());
 
   const statoCompleto = {
     tipiImpianto,
@@ -248,6 +253,7 @@ export default function App() {
 
       <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
         <div className="flex flex-wrap gap-2 justify-end no-print">
+          <ProfiloProfessionistaPanel profilo={profilo} onChange={setProfilo} />
           <ProgettiPanel statoCorrente={statoCompleto} progettoAttivoId={progettoAttivoId} onCarica={caricaProgetto} onSalvatoConSuccesso={setProgettoAttivoId} />
           <StoricoRichieste />
         </div>
@@ -399,6 +405,7 @@ export default function App() {
                 trattamentoAcque={trattamentoAcque}
                 pompeIdrauliche={pompeIdrauliche}
                 biomassa={biomassa}
+                profilo={profilo}
               />
             </div>
           </section>
