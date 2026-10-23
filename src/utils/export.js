@@ -80,8 +80,17 @@ export function generaMailtoLink({ destinatarioEmail, testo, oggetto }) {
 }
 
 /** Costruisce un link wa.me con testo precompilato, per l'invio rapido via WhatsApp (canale tipico di installatori/rivenditori da sopralluogo). */
-export function generaWhatsAppLink(testo) {
-  return `https://wa.me/?text=${encodeURIComponent(testo)}`;
+/**
+ * Link WhatsApp con il messaggio già scritto. Con un numero apre la chat
+ * con quel destinatario; senza numero WhatsApp chiede a chi scrive di
+ * scegliere un contatto, e la richiesta può finire a chiunque.
+ *
+ * @param {string} testo
+ * @param {string|null} numero  in formato internazionale senza "+" né spazi (es. "393331234567")
+ */
+export function generaWhatsAppLink(testo, numero = null) {
+  const destinatario = numero ? String(numero).replace(/\D/g, "") : "";
+  return `https://wa.me/${destinatario}?text=${encodeURIComponent(testo)}`;
 }
 
 export async function copiaNegliAppunti(testo) {

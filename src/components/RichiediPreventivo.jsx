@@ -3,10 +3,18 @@ import { validaLead } from "../utils/validazione.js";
 import { generaRiepilogoTesto, generaMailtoLink, generaWhatsAppLink, copiaNegliAppunti, formattaEuro } from "../utils/export.js";
 import { registraRichiestaStorico } from "../utils/persistenza.js";
 
-// Indirizzo email placeholder a cui viene indirizzata la richiesta di preventivo — sostituire con l'indirizzo reale dell'agente/rivenditore.
-const EMAIL_PLACEHOLDER = "preventivi@azienda-esempio.it";
-// Indirizzo email placeholder per le richieste di supporto tecnico prioritario (es. progetti complessi VRF/plurifamiliari) — può coincidere con quello sopra.
-const EMAIL_SUPPORTO_PLACEHOLDER = "supporto-tecnico@azienda-esempio.it";
+/**
+ * Indirizzo a cui arrivano tutte le richieste: preventivi e supporto
+ * tecnico. Un indirizzo solo, perché a riceverle è la stessa persona; le
+ * richieste di supporto tecnico restano riconoscibili dall'oggetto della
+ * mail, che le marca come prioritarie.
+ */
+const EMAIL_RICHIESTE = "lmrappresentanze@lucamaracchia.com";
+
+/** Numero WhatsApp a cui arrivano le richieste, in formato internazionale (prefisso 39 per l'Italia). */
+const WHATSAPP_RICHIESTE = "393896390261";
+/** Lo stesso numero, scritto come lo si legge. */
+const WHATSAPP_LEGGIBILE = "389 639 0261";
 
 /**
  * Sezione "Richiedi preventivo": nome/azienda del compilatore, cliente
@@ -75,7 +83,7 @@ export default function RichiediPreventivo({ prodottiConsigliati, edificio, comu
     const oggetto = prioritaria
       ? "[SUPPORTO TECNICO PRIORITARIO] Richiesta preventivo — dimensionamento impianto"
       : "Richiesta preventivo — dimensionamento impianto";
-    const link = generaMailtoLink({ destinatarioEmail: prioritaria ? EMAIL_SUPPORTO_PLACEHOLDER : EMAIL_PLACEHOLDER, testo, oggetto });
+    const link = generaMailtoLink({ destinatarioEmail: EMAIL_RICHIESTE, testo, oggetto });
     registraInvio("email");
     window.location.href = link;
   }
@@ -83,7 +91,7 @@ export default function RichiediPreventivo({ prodottiConsigliati, edificio, comu
   function handleWhatsApp() {
     const testo = generaRiepilogoTesto({ branding, comune, edificio, prodottiSelezionati, lead });
     registraInvio("whatsapp");
-    window.open(generaWhatsAppLink(testo), "_blank", "noopener,noreferrer");
+    window.open(generaWhatsAppLink(testo, WHATSAPP_RICHIESTE), "_blank", "noopener,noreferrer");
   }
 
   async function handleCopia() {
@@ -199,9 +207,20 @@ export default function RichiediPreventivo({ prodottiConsigliati, edificio, comu
           {copiato ? "Copiato ✓" : "Copia riepilogo negli appunti"}
         </button>
       </div>
+      {/* Il pulsante email apre il programma di posta del dispositivo: chi usa
+          solo la posta dal browser può non averne uno, e il clic non fa nulla.
+          L'indirizzo scritto per esteso e il riepilogo da copiare gli danno
+          comunque un modo per arrivare. */}
       <p className={`text-[11px] ${evidenziato ? "text-brand-100" : "text-slate-400"}`}>
-        L'indirizzo email di destinazione ({prioritaria ? EMAIL_SUPPORTO_PLACEHOLDER : EMAIL_PLACEHOLDER}) è un
-        segnaposto: sostituirlo con il recapito reale prima della messa in produzione.
+        La richiesta arriva a{" "}
+        <a href={`mailto:${EMAIL_RICHIESTE}`} className="underline font-medium">
+          {EMAIL_RICHIESTE}
+        </a>
+        {" "}o su WhatsApp al{" "}
+        <a href={`https://wa.me/${WHATSAPP_RICHIESTE}`} target="_blank" rel="noopener noreferrer" className="underline font-medium">
+          {WHATSAPP_LEGGIBILE}
+        </a>
+        . Se non si apre il tuo programma di posta, copia il riepilogo e invialo a uno dei due.
       </p>
     </div>
   );
