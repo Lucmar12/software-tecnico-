@@ -45,7 +45,8 @@ export function validaAmbiente(ambiente) {
 
   if (!(ambiente.numeroOccupanti >= 0)) errori.numeroOccupanti = "Il numero di occupanti non può essere negativo.";
 
-  if (ambiente.ultimoPiano && ambiente.pianoTerra) errori.piano = "Un ambiente non può essere contemporaneamente al piano terra e all'ultimo piano.";
+  // Piano terra e ultimo piano insieme è la casa a un piano: la stanza
+  // disperde sia verso il terreno sia verso il tetto, ed è corretto.
 
   return errori;
 }

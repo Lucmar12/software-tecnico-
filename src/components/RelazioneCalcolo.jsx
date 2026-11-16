@@ -19,6 +19,7 @@ import { dimensionaBiomassa } from "../utils/biomassa.js";
 import { profiloCompilato } from "../utils/profiloProfessionista.js";
 import { EsitoVerifica } from "./VerificaPotenza.jsx";
 import { eseguiVerifica, modalitaEffettiva } from "../utils/verificaPotenza.js";
+import { frasiInBreve } from "../utils/inBreve.js";
 import { calcolaBollitore, ZONE_CLIMATICHE } from "../data/calculations.js";
 import { trovaBollitoriConsigliati } from "../data/catalogo.js";
 import { stimaConsumoAnnuoClimatizzazione } from "../utils/fotovoltaico.js";
@@ -94,8 +95,26 @@ export default function RelazioneCalcolo({ scenari, scenarioProgetto, comune, ac
   // alla stessa domanda dell'utente, invece di srotolarle tutte in un
   // unico scorrimento in cui "quanto costa" e "come l'hai calcolato"
   // stanno alla stessa distanza.
+  const inBreve = frasiInBreve({
+    edificio: mostraAmbienti ? scenarioDaPreventivare?.edificio : null,
+    mostraAmbienti,
+    mostraClima,
+    voci: vociRiepilogo,
+    verifica: risultatoVerifica,
+  });
+
   const schedaCosaTiServe = (
     <>
+      {inBreve.length > 0 && (
+        <section className="rounded-xl border-2 border-brand-200 bg-brand-50 p-4 space-y-1.5">
+          <h2 className="text-lg font-bold text-slate-800">In breve</h2>
+          {inBreve.map((f) => (
+            <p key={f} className="text-base text-slate-800">
+              {f}
+            </p>
+          ))}
+        </section>
+      )}
       {bloccoVerifica(true)}
       <RiepilogoSceltaProdotti
         voci={vociRiepilogo}

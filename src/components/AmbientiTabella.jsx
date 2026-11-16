@@ -28,6 +28,7 @@ const PIANI = [
   { value: "terra", breve: "Terra" },
   { value: "intermedio", breve: "Intermedio" },
   { value: "ultimo", breve: "Ultimo" },
+  { value: "unico", breve: "Unico (casa a un piano)" },
 ];
 
 const cella = "px-1 py-1 align-top";

@@ -87,11 +87,13 @@ export function ripristinaCalcoloAutomatico(ambiente, campo) {
 
 /** Posizione in edificio come valore unico ("terra" | "intermedio" | "ultimo"). */
 export function pianoAmbiente(ambiente) {
+  if (ambiente.ultimoPiano && ambiente.pianoTerra) return "unico";
   return ambiente.ultimoPiano ? "ultimo" : ambiente.pianoTerra ? "terra" : "intermedio";
 }
 
 export function impostaPianoAmbiente(ambiente, piano) {
-  return { ...ambiente, ultimoPiano: piano === "ultimo", pianoTerra: piano === "terra" };
+  // "unico": casa a un piano, terreno sotto e tetto sopra.
+  return { ...ambiente, ultimoPiano: piano === "ultimo" || piano === "unico", pianoTerra: piano === "terra" || piano === "unico" };
 }
 
 export function nuovoScenario(nome = "Stato di fatto", ambienti = null) {

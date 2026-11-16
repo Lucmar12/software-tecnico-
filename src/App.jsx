@@ -3,7 +3,7 @@ import Header from "./components/Header.jsx";
 import TipoImpiantoSelector from "./components/TipoImpiantoSelector.jsx";
 import ComuneSelector from "./components/ComuneSelector.jsx";
 import ScenariTabs from "./components/ScenariTabs.jsx";
-import AmbientiTabella from "./components/AmbientiTabella.jsx";
+import AmbientiEditor from "./components/AmbientiEditor.jsx";
 import ACSForm from "./components/ACSForm.jsx";
 import TrattamentoAcqueForm from "./components/TrattamentoAcqueForm.jsx";
 import PompeIdraulicheForm from "./components/PompeIdraulicheForm.jsx";
@@ -330,8 +330,8 @@ export default function App() {
 
         {servonoAmbienti && (
           <section id="sezione-ambienti" className="space-y-3 no-print">
-            <StepHeader numero={nAmbienti} titolo={`Ambienti — ${scenarioAttivo.nome}`} />
-            <AmbientiTabella
+            <StepHeader numero={nAmbienti} titolo={`Le stanze — ${scenarioAttivo.nome}`} />
+            <AmbientiEditor
               ambienti={scenarioAttivo.ambienti}
               comune={comune}
               onChange={(ambienti) => aggiornaAmbientiScenario(scenarioAttivo.id, ambienti)}
