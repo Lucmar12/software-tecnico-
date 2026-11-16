@@ -44,7 +44,7 @@ import {
 import { confrontaMonoMulti } from "../src/utils/confrontoMonoMulti.js";
 import { dimensionaBiomassa, ambientiServiti, descrizioneApparecchio, POTENZA_MINIMA_COMMERCIALE_KW } from "../src/utils/biomassa.js";
 import { oreEquivalentiRiscaldamento } from "../src/utils/fotovoltaico.js";
-import { edificioEquivalente, caricoDaVolume, verificaPotenza, eseguiVerifica, nuovaVerificaPotenza } from "../src/utils/verificaPotenza.js";
+import { edificioEquivalente, caricoDaVolume, verificaPotenza, eseguiVerifica, nuovaVerificaPotenza, potenzaGiusta, confrontoPerEpoca, modalitaEffettiva, verificaCompilata } from "../src/utils/verificaPotenza.js";
 import { MONOSPLIT_AUX, LIGHT_COMMERCIAL_AUX, UNITA_INTERNE_MULTI_AUX, UNITA_ESTERNE_MULTI_AUX, capacitaGarantita, prezzoSistema } from "../src/data/gammaAux.js";
 import { calcolaSuperficieMuriEsterni, sviluppoParetiEsterne, areaFinestra, normalizzaGeometria, geometriaSoffitto } from "../src/utils/stime.js";
 import { ORE_DI_CALCOLO, quotaIrraggiamento, temperaturaEsternaOraria, ESCURSIONE_DEFAULT_K } from "../src/utils/profiliOrari.js";
@@ -921,6 +921,59 @@ function ambienteRiferimento(extra = {}) {
     24.6,
     1e-12
   );
+}
+
+// ---------------------------------------------------------------------
+// VERIFICA: CARICO NOTO, CONSIGLI, CONFRONTO PER EPOCA
+// ---------------------------------------------------------------------
+{
+  // Carico noto dalla relazione di progetto: 5 kW, 26 nominali e 24,6 all'acqua
+  //   copertura 24,6 / 5 = 492% → troppo grande
+  //   potenza giusta: da 5 a 5 × 1,25 = 6,25 kW all'acqua, sotto i 10 kW
+  //   della idro più piccola → si propongono idro minima + puffer o pompa di calore
+  const nota = eseguiVerifica({ verifica: nuovaVerificaPotenza({ modalita: "carico", caricoNotoKw: 5, potenzaAcquaKw: 24.6, volumeM3: null }), comune: COMUNE, edificio: null });
+  uguale("carico noto: usato così com'è [kW]", nota.caricoKw, 5, 1e-12);
+  uguale("carico noto: copertura", nota.copertura, 24.6 / 5, 1e-12);
+  vero("carico noto senza volume: niente metri cubi", nota.volumeMassimoM3 === null);
+  uguale("potenza giusta, minimo [kW all'acqua]", potenzaGiusta(nota).minimoKw, 5, 1e-12);
+  uguale("potenza giusta, massimo [kW all'acqua]", potenzaGiusta(nota).massimoKw, 6.25, 1e-12);
+  const proposta = nota.consigli.find((c) => c.titolo === "Cosa proporre");
+  vero("sotto la taglia minima idro: propone puffer o pompa di calore", /puffer/.test(proposta.testo) && /pompa di calore/.test(proposta.testo));
+  vero("troppo grande: spiega cosa comporta", nota.consigli.some((c) => c.titolo === "Cosa comporta"));
+  vero("carico noto senza valore: la verifica non parte", eseguiVerifica({ verifica: nuovaVerificaPotenza({ modalita: "carico" }), comune: COMUNE, edificio: null }) === null);
+
+  // Sopra la taglia minima: 26 kW su 15 kW di carico → giusta tra 15 e 18,75 kW
+  const media = eseguiVerifica({ verifica: nuovaVerificaPotenza({ modalita: "carico", caricoNotoKw: 15 }), comune: COMUNE, edificio: null });
+  vero("sopra la taglia minima: propone l'intervallo giusto", /tra 15 e 18,8 kW/.test(media.consigli.find((c) => c.titolo === "Cosa proporre").testo));
+
+  // Pompa di calore: la potenza giusta è di catalogo, quindi divisa per il calo al freddo
+  const pdc = verificaPotenza({ potenzaKw: 10, caricoKw: 12, tipoGeneratore: "pompa_di_calore", comune: COMUNE });
+  uguale("pompa di calore: potenza di catalogo minima [kW]", potenzaGiusta(pdc).minimoKw, 12 / pdc.fattoreDerating, 1e-9);
+  vero("non basta: dice quanto serve", pdc.esito === "insufficiente");
+
+  // Adeguata con idro: ricorda l'acqua calda sanitaria
+  const ok = eseguiVerifica({ verifica: nuovaVerificaPotenza({ modalita: "carico", caricoNotoKw: 20, potenzaAcquaKw: 24.6 }), comune: COMUNE, edificio: null });
+  vero("adeguata: ricorda che l'acqua calda sanitaria riduce il margine", ok.esito === "adeguata" && /acqua calda sanitaria/.test(ok.consigli[0].testo) && /23%/.test(ok.consigli[0].testo));
+
+  // Stima da volume su casa recente: rimanda alla relazione ex Legge 10
+  const recente = eseguiVerifica({ verifica: nuovaVerificaPotenza({ epocaCostruttiva: "post-2015" }), comune: COMUNE, edificio: null });
+  vero("casa recente: rimanda alla relazione ex Legge 10", recente.consigli.some((c) => /Legge 10/.test(c.testo)));
+  vero("carico noto: niente rimando alla stima", !nota.consigli.some((c) => /Legge 10|casa tipo/.test(c.testo)));
+
+  // Confronto per epoca: stesso risultato di cinque verifiche separate
+  const epoche = ["ante-1975", "1976-1990", "1991-2005", "2006-2015", "post-2015"];
+  const righe = confrontoPerEpoca({ verifica: nuovaVerificaPotenza(), comune: COMUNE, epoche });
+  vero("confronto: una riga per epoca", righe.length === 5);
+  for (const r of righe) {
+    const singola = eseguiVerifica({ verifica: nuovaVerificaPotenza({ epocaCostruttiva: r.epocaCostruttiva }), comune: COMUNE, edificio: null });
+    uguale(`confronto ${r.epocaCostruttiva}: carico uguale alla verifica singola [kW]`, r.caricoKw, singola.caricoKw, 1e-12);
+  }
+
+  // Modalità
+  ugualeTesto("'dagli ambienti' senza ambienti ricade sul volume", modalitaEffettiva({ modalita: "ambienti" }, false), "volume");
+  ugualeTesto("'carico noto' resta tale anche senza ambienti", modalitaEffettiva({ modalita: "carico" }, false), "carico");
+  vero("carico noto vuoto: non compilata", !verificaCompilata(nuovaVerificaPotenza({ modalita: "carico" }), false));
+  vero("carico noto inserito: compilata", verificaCompilata(nuovaVerificaPotenza({ modalita: "carico", caricoNotoKw: 5 }), false));
 }
 
 // ---------------------------------------------------------------------

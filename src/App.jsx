@@ -20,7 +20,7 @@ import ProfiloProfessionistaPanel from "./components/ProfiloProfessionistaPanel.
 import { caricaProfilo } from "./utils/profiloProfessionista.js";
 import { nuovaBiomassa } from "./utils/biomassa.js";
 import VerificaPotenzaForm from "./components/VerificaPotenza.jsx";
-import { nuovaVerificaPotenza } from "./utils/verificaPotenza.js";
+import { nuovaVerificaPotenza, modalitaEffettiva, verificaCompilata } from "./utils/verificaPotenza.js";
 import { BRANDING_FISSO } from "./utils/brandingFisso.js";
 import { nuovoScenario, nuovoTrattamentoAcque, nuovaPompeIdrauliche } from "./utils/modelli.js";
 import { ambienteValido } from "./utils/validazione.js";
@@ -198,7 +198,8 @@ export default function App() {
     !tipiImpianto.verificaPotenza ||
     (Boolean(comune) &&
       verificaPotenza.potenzaKw > 0 &&
-      (verificaPotenza.modalita === "ambienti" && servonoAmbienti ? ambientiValidi : verificaPotenza.volumeM3 > 0 && verificaPotenza.altezzaM > 0));
+      verificaCompilata(verificaPotenza, servonoAmbienti) &&
+      (modalitaEffettiva(verificaPotenza, servonoAmbienti) !== "ambienti" || ambientiValidi));
   const climatizzazioneOk = !servonoAmbienti || (Boolean(comune) && ambientiValidi);
   const acsOk = !tipiImpianto.acs || acsValido;
   const trattamentoAcqueOk = !tipiImpianto.trattamentoAcque || trattamentoAcqueValido;
@@ -248,7 +249,7 @@ export default function App() {
    */
   const mancanze = [
     serveComune && !comune && { id: "sezione-comune", testo: "Seleziona il comune per ricavare i dati climatici di progetto" },
-    tipiImpianto.verificaPotenza && Boolean(comune) && !verificaPronta && { id: "sezione-verifica", testo: "Inserisci potenza e volume della macchina da verificare" },
+    tipiImpianto.verificaPotenza && Boolean(comune) && !verificaPronta && { id: "sezione-verifica", testo: "Inserisci la potenza della macchina e i dati della casa" },
     servonoAmbienti && Boolean(comune) && !ambientiValidi && { id: "sezione-ambienti", testo: "Completa correttamente almeno un ambiente" },
     tipiImpianto.acs && !acsOk && { id: "sezione-acs", testo: "Inserisci il numero di persone servite dall'acqua calda sanitaria" },
     tipiImpianto.trattamentoAcque && !trattamentoAcqueOk && { id: "sezione-trattamento-acque", testo: "Inserisci numero di persone e durezza dell'acqua per l'addolcitore" },

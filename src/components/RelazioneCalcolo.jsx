@@ -18,7 +18,7 @@ import BiomassaDettaglio from "./BiomassaDettaglio.jsx";
 import { dimensionaBiomassa } from "../utils/biomassa.js";
 import { profiloCompilato } from "../utils/profiloProfessionista.js";
 import { EsitoVerifica } from "./VerificaPotenza.jsx";
-import { eseguiVerifica } from "../utils/verificaPotenza.js";
+import { eseguiVerifica, modalitaEffettiva } from "../utils/verificaPotenza.js";
 import { calcolaBollitore, ZONE_CLIMATICHE } from "../data/calculations.js";
 import { trovaBollitoriConsigliati } from "../data/catalogo.js";
 import { stimaConsumoAnnuoClimatizzazione } from "../utils/fotovoltaico.js";
@@ -75,7 +75,7 @@ export default function RelazioneCalcolo({ scenari, scenarioProgetto, comune, ac
   // Verifica di una macchina: dagli ambienti se ci sono, altrimenti da volume.
   const risultatoVerifica = mostraVerifica
     ? eseguiVerifica({
-        verifica: { ...verificaPotenza, modalita: mostraAmbienti && scenarioDaPreventivare ? verificaPotenza.modalita : "volume" },
+        verifica: { ...verificaPotenza, modalita: modalitaEffettiva(verificaPotenza, Boolean(mostraAmbienti && scenarioDaPreventivare)) },
         comune,
         edificio: scenarioDaPreventivare?.edificio ?? null,
       })

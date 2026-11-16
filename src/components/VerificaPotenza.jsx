@@ -1,5 +1,14 @@
 import React from "react";
-import { TIPI_EDIFICIO, TIPI_GENERATORE, IPOTESI_EDIFICIO_EQUIVALENTE, eseguiVerifica, edificioEquivalente, haTetto } from "../utils/verificaPotenza.js";
+import {
+  TIPI_EDIFICIO,
+  TIPI_GENERATORE,
+  IPOTESI_EDIFICIO_EQUIVALENTE,
+  eseguiVerifica,
+  edificioEquivalente,
+  haTetto,
+  modalitaEffettiva,
+  confrontoPerEpoca,
+} from "../utils/verificaPotenza.js";
 import { geometriaSoffitto } from "../utils/stime.js";
 import { OPZIONI_EPOCA } from "../utils/modelli.js";
 import { formattaKw } from "../utils/export.js";
@@ -34,6 +43,7 @@ export function EsitoVerifica({ risultato, compatto = false }) {
           : ""}
         {r.fattoreDerating < 1 ? ` al giorno più freddo (${formattaKw(r.potenzaKw)} di catalogo × ${r.fattoreDerating.toFixed(2)})` : ""}; la casa
         ne chiede {formattaKw(r.caricoKw)}
+        {r.modalita === "carico" ? " secondo il calcolo di progetto" : ""}
         {r.volumeM3 ? ` su ${Math.round(r.volumeM3)} m³, cioè ${Math.round((r.caricoKw * 1000) / r.volumeM3)} W/m³` : ""}.
       </p>
       {r.volumeMassimoM3 && (
@@ -48,8 +58,19 @@ export function EsitoVerifica({ risultato, compatto = false }) {
           .
         </p>
       )}
+      {r.consigli?.length > 0 && (
+        <div className="space-y-1.5 pt-1">
+          {r.consigli
+            .filter((c) => !compatto || c.titolo === "Cosa proporre" || c.titolo === "Cosa serve")
+            .map((c) => (
+              <p key={c.titolo} className="text-sm">
+                <strong>{c.titolo}.</strong> {c.testo}
+              </p>
+            ))}
+        </div>
+      )}
       {!compatto && <p className="text-xs opacity-90">{r.potenzaAcquaKw ? r.tipo.nota.replace(/: controlla sulla scheda la potenza resa all'acqua\./, ": la verifica usa la potenza resa all'acqua che hai indicato.") : r.tipo.nota}</p>}
-      {!compatto && !r.daAmbienti && (
+      {!compatto && r.modalita === "volume" && (
         <p className="text-xs opacity-80">
           Carico stimato su un edificio equivalente — pianta quadrata, vetrate al{" "}
           {Math.round(IPOTESI_EDIFICIO_EQUIVALENTE.quotaVetrata * 100)}% del pavimento, esposizione neutra. Per il dato
@@ -67,7 +88,7 @@ export function EsitoVerifica({ risultato, compatto = false }) {
  */
 export default function VerificaPotenzaForm({ verifica, onChange, comune, edificio, ambientiDisponibili }) {
   const set = (campo, valore) => onChange({ ...verifica, [campo]: valore });
-  const modalita = ambientiDisponibili ? verifica.modalita : "volume";
+  const modalita = modalitaEffettiva(verifica, ambientiDisponibili);
   const risultato = eseguiVerifica({ verifica: { ...verifica, modalita }, comune, edificio });
   const tipoGen = TIPI_GENERATORE[verifica.tipoGeneratore];
   const conTetto = haTetto(verifica.tipoEdificio);
@@ -117,12 +138,12 @@ export default function VerificaPotenzaForm({ verifica, onChange, comune, edific
         )}
       </div>
 
-      {ambientiDisponibili && (
-        <div className="flex flex-wrap gap-2 text-sm">
+      <div className="flex flex-wrap gap-2 text-sm">
           <span className="text-xs font-medium text-slate-500 self-center">Carico della casa:</span>
           {[
             ["volume", "stima da volume"],
-            ["ambienti", "dagli ambienti della tabella"],
+            ["carico", "carico noto (relazione di progetto)"],
+            ...(ambientiDisponibili ? [["ambienti", "dagli ambienti della tabella"]] : []),
           ].map(([valore, etichetta]) => (
             <button
               key={valore}
@@ -134,6 +155,37 @@ export default function VerificaPotenzaForm({ verifica, onChange, comune, edific
               {etichetta}
             </button>
           ))}
+      </div>
+
+      {modalita === "carico" && (
+        <div className="grid sm:grid-cols-2 gap-3">
+          <label className="block">
+            <span className="text-xs font-medium text-slate-500">Carico termico di progetto [kW]</span>
+            <input
+              type="number"
+              min="0"
+              step="0.1"
+              className={inputCls}
+              value={verifica.caricoNotoKw ?? ""}
+              placeholder="es. 5,2"
+              onChange={(e) => set("caricoNotoKw", e.target.value === "" ? null : Number(e.target.value))}
+            />
+            <span className="text-[11px] text-slate-400">
+              dalla relazione energetica ex Legge 10: potenza invernale di progetto dell'edificio
+            </span>
+          </label>
+          <label className="block">
+            <span className="text-xs font-medium text-slate-500">Volume riscaldato [m³] — facoltativo</span>
+            <input
+              type="number"
+              min="0"
+              step="10"
+              className={inputCls}
+              value={verifica.volumeM3 ?? ""}
+              onChange={(e) => set("volumeM3", e.target.value === "" ? null : Number(e.target.value))}
+            />
+            <span className="text-[11px] text-slate-400">serve solo a dire fino a quanti m³ basterebbe la macchina</span>
+          </label>
         </div>
       )}
 
@@ -141,7 +193,7 @@ export default function VerificaPotenzaForm({ verifica, onChange, comune, edific
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <label className="block">
             <span className="text-xs font-medium text-slate-500">Volume da scaldare [m³]</span>
-            <input type="number" min="0" step="10" className={inputCls} value={verifica.volumeM3} onChange={(e) => set("volumeM3", Number(e.target.value))} />
+            <input type="number" min="0" step="10" className={inputCls} value={verifica.volumeM3 ?? ""} onChange={(e) => set("volumeM3", Number(e.target.value))} />
           </label>
           <label className={`block ${falde && TIPI_EDIFICIO[verifica.tipoEdificio]?.piani === 1 ? "hidden" : ""}`}>
             <span className="text-xs font-medium text-slate-500">{falde ? "Altezza dei piani sotto [m]" : "Altezza dei locali [m]"}</span>
@@ -227,8 +279,55 @@ export default function VerificaPotenzaForm({ verifica, onChange, comune, edific
       {!comune ? (
         <p className="text-xs text-amber-700">Scegli il comune: il carico dipende dalla temperatura esterna di progetto.</p>
       ) : (
-        <EsitoVerifica risultato={risultato} />
+        <>
+          <EsitoVerifica risultato={risultato} />
+          {modalita === "volume" && risultato && <ConfrontoEpoche verifica={verifica} comune={comune} epocaScelta={verifica.epocaCostruttiva} />}
+        </>
       )}
+    </div>
+  );
+}
+
+const ETICHETTA_ESITO = { insufficiente: "non basta", adeguata: "adeguata", sovradimensionata: "troppo grande" };
+const COLORE_ESITO = { insufficiente: "text-red-700", adeguata: "text-emerald-700", sovradimensionata: "text-amber-700" };
+
+/**
+ * La stessa macchina sulla stessa casa, epoca per epoca. Risponde alla
+ * domanda "e nel caso peggiore?" senza dover cambiare la tendina cinque
+ * volte: la casa più vecchia è quella che chiede di più.
+ */
+function ConfrontoEpoche({ verifica, comune, epocaScelta }) {
+  const righe = confrontoPerEpoca({ verifica, comune, epoche: OPZIONI_EPOCA.map((o) => o.value) }).filter(Boolean);
+  if (righe.length === 0) return null;
+  const sintesi = righe.some((r) => r.esito === "insufficiente")
+    ? "In qualche caso non basta: conta sapere quando è stata costruita la casa e se è stata isolata."
+    : "In nessun caso resta corta: anche la casa che disperde di più è coperta. Per le case più recenti il rischio è l'opposto, che sia troppo grande.";
+  return (
+    <div className="border border-slate-200 rounded-xl p-3 space-y-2">
+      <p className="text-xs font-semibold text-slate-600">La stessa macchina, se la casa fosse di un'altra epoca</p>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs tabular-nums">
+          <thead>
+            <tr className="text-left text-slate-400">
+              <th className="font-medium py-1 pr-3">Costruita</th>
+              <th className="font-medium py-1 pr-3 text-right">La casa chiede</th>
+              <th className="font-medium py-1 pr-3 text-right">Copertura</th>
+              <th className="font-medium py-1">Esito</th>
+            </tr>
+          </thead>
+          <tbody>
+            {righe.map((r) => (
+              <tr key={r.epocaCostruttiva} className={`border-t border-slate-100 ${r.epocaCostruttiva === epocaScelta ? "bg-slate-50 font-semibold" : ""}`}>
+                <td className="py-1 pr-3">{OPZIONI_EPOCA.find((o) => o.value === r.epocaCostruttiva)?.label}</td>
+                <td className="py-1 pr-3 text-right">{formattaKw(r.caricoKw)}</td>
+                <td className="py-1 pr-3 text-right">{Math.round(r.copertura * 100)}%</td>
+                <td className={`py-1 ${COLORE_ESITO[r.esito]}`}>{ETICHETTA_ESITO[r.esito]}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-xs text-slate-600">{sintesi}</p>
     </div>
   );
 }
