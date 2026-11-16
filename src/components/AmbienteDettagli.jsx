@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ETICHETTE_CAMPI, areaFinestra, sviluppoParetiEsterne } from "../utils/stime.js";
+import { ETICHETTE_CAMPI, areaFinestra, sviluppoParetiEsterne, TIPI_SOFFITTO, geometriaSoffitto } from "../utils/stime.js";
 import { PARAMETRI_CALCOLO, parametro, parametroDefault, parametriPerGruppo, parametriSovrascritti } from "../utils/parametriCalcolo.js";
 import { aggiornaCampoAmbiente, ripristinaCalcoloAutomatico } from "../utils/modelli.js";
 import { validaAmbiente } from "../utils/validazione.js";
@@ -88,6 +88,66 @@ export default function AmbienteDettagli({ ambiente, onChange }) {
           Muri e finestre sono ricavati dai dati della riga. Sovrascrivili solo se hai il rilievo con le misure
           effettive: il valore inserito smette di essere ricalcolato.
         </div>
+      </div>
+
+      <div className="pt-2 border-t border-slate-100 grid sm:grid-cols-3 gap-3 items-start">
+        <label className="block text-xs">
+          <span className="font-medium text-slate-500">Soffitto</span>
+          <select
+            className={inputCls}
+            value={ambiente.soffitto ?? "piano"}
+            onChange={(e) =>
+              onChange(
+                aggiornaCampoAmbiente(
+                  // Passando alle falde si propone un colmo un metro e mezzo
+                  // sopra l'imposta, da correggere con la misura vera.
+                  e.target.value === "dueFalde" && !(ambiente.altezzaColmo > ambiente.altezza)
+                    ? { ...ambiente, altezzaColmo: Math.round((Number(ambiente.altezza) + 1.5) * 100) / 100 }
+                    : ambiente,
+                  "soffitto",
+                  e.target.value
+                )
+              )
+            }
+          >
+            {TIPI_SOFFITTO.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+          <span className="text-[10px] text-slate-400 block">mansarda o ultimo piano sotto il tetto</span>
+        </label>
+        {ambiente.soffitto === "dueFalde" && (
+          <>
+            <label className="block text-xs">
+              <span className="font-medium text-slate-500">Altezza al colmo [m]</span>
+              <input
+                type="number"
+                step="0.05"
+                min="0"
+                className={inputCls}
+                value={ambiente.altezzaColmo ?? ""}
+                onChange={(e) => set("altezzaColmo", e.target.value === "" ? null : Number(e.target.value))}
+              />
+              {errori.altezzaColmo ? (
+                <span className="text-[11px] text-red-600">{errori.altezzaColmo}</span>
+              ) : (
+                <span className="text-[10px] text-slate-400 block">al centro, sotto il punto più alto del tetto</span>
+              )}
+            </label>
+            <div className="text-[11px] text-slate-500 self-center">
+              {(() => {
+                const g = geometriaSoffitto(ambiente);
+                return g.inclinato
+                  ? `L'altezza in tabella è quella all'imposta (${ambiente.altezza} m). Altezza media ${g.altezzaMedia.toFixed(2)} m, volume ${(
+                      ambiente.superficiePavimento * g.altezzaMedia
+                    ).toFixed(1)} m³, falde ${g.superficieCopertura.toFixed(1)} m².`
+                  : "L'altezza in tabella è quella all'imposta, lungo i muri lunghi.";
+              })()}
+            </div>
+          </>
+        )}
       </div>
 
       <div className="pt-2 border-t border-slate-100">

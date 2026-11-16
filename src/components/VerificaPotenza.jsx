@@ -1,5 +1,6 @@
 import React from "react";
-import { TIPI_EDIFICIO, TIPI_GENERATORE, IPOTESI_EDIFICIO_EQUIVALENTE, eseguiVerifica } from "../utils/verificaPotenza.js";
+import { TIPI_EDIFICIO, TIPI_GENERATORE, IPOTESI_EDIFICIO_EQUIVALENTE, eseguiVerifica, edificioEquivalente, haTetto } from "../utils/verificaPotenza.js";
+import { geometriaSoffitto } from "../utils/stime.js";
 import { OPZIONI_EPOCA } from "../utils/modelli.js";
 import { formattaKw } from "../utils/export.js";
 
@@ -28,6 +29,9 @@ export function EsitoVerifica({ risultato, compatto = false }) {
       </div>
       <p className="text-sm">
         La macchina rende {formattaKw(r.potenzaEffettivaKw)}
+        {r.potenzaAcquaKw
+          ? ` all'acqua dei termosifoni (su ${formattaKw(r.potenzaKw)} nominali: ${formattaKw(r.potenzaKw - r.potenzaAcquaKw)} scaldano solo il locale dove è installata)`
+          : ""}
         {r.fattoreDerating < 1 ? ` al giorno più freddo (${formattaKw(r.potenzaKw)} di catalogo × ${r.fattoreDerating.toFixed(2)})` : ""}; la casa
         ne chiede {formattaKw(r.caricoKw)}
         {r.volumeM3 ? ` su ${Math.round(r.volumeM3)} m³, cioè ${Math.round((r.caricoKw * 1000) / r.volumeM3)} W/m³` : ""}.
@@ -44,7 +48,7 @@ export function EsitoVerifica({ risultato, compatto = false }) {
           .
         </p>
       )}
-      {!compatto && <p className="text-xs opacity-90">{r.tipo.nota}</p>}
+      {!compatto && <p className="text-xs opacity-90">{r.potenzaAcquaKw ? r.tipo.nota.replace(/: controlla sulla scheda la potenza resa all'acqua\./, ": la verifica usa la potenza resa all'acqua che hai indicato.") : r.tipo.nota}</p>}
       {!compatto && !r.daAmbienti && (
         <p className="text-xs opacity-80">
           Carico stimato su un edificio equivalente — pianta quadrata, vetrate al{" "}
@@ -65,6 +69,15 @@ export default function VerificaPotenzaForm({ verifica, onChange, comune, edific
   const set = (campo, valore) => onChange({ ...verifica, [campo]: valore });
   const modalita = ambientiDisponibili ? verifica.modalita : "volume";
   const risultato = eseguiVerifica({ verifica: { ...verifica, modalita }, comune, edificio });
+  const tipoGen = TIPI_GENERATORE[verifica.tipoGeneratore];
+  const conTetto = haTetto(verifica.tipoEdificio);
+  const falde = conTetto && verifica.soffitto === "dueFalde";
+  // Superficie e geometria ricavate dallo stesso edificio equivalente usato
+  // nel calcolo, così quello che si legge sotto i campi è quello calcolato.
+  const ambientiEq = verifica.volumeM3 > 0 && verifica.altezzaM > 0 ? edificioEquivalente(verifica) : [];
+  const superficieTotale = ambientiEq.reduce((s, a) => s + a.superficiePavimento, 0);
+  const ultimoEq = ambientiEq[ambientiEq.length - 1];
+  const geoUltimo = ultimoEq ? geometriaSoffitto(ultimoEq) : null;
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-4">
@@ -83,6 +96,25 @@ export default function VerificaPotenzaForm({ verifica, onChange, comune, edific
             ))}
           </select>
         </label>
+        {tipoGen?.idro && (
+          <label className="block sm:col-span-2">
+            <span className="text-xs font-medium text-slate-500">Potenza resa all'acqua [kW] — facoltativa</span>
+            <input
+              type="number"
+              min="0"
+              step="0.1"
+              className={inputCls}
+              value={verifica.potenzaAcquaKw ?? ""}
+              placeholder="dalla scheda tecnica, es. 24,6"
+              onChange={(e) => set("potenzaAcquaKw", e.target.value === "" ? null : Number(e.target.value))}
+            />
+            <span className="text-[11px] text-slate-400">
+              {verifica.potenzaAcquaKw > verifica.potenzaKw
+                ? "Supera la nominale: non è possibile, si usa la nominale."
+                : "È la parte che arriva ai termosifoni. Se la inserisci la verifica usa questa, non la nominale."}
+            </span>
+          </label>
+        )}
       </div>
 
       {ambientiDisponibili && (
@@ -111,10 +143,10 @@ export default function VerificaPotenzaForm({ verifica, onChange, comune, edific
             <span className="text-xs font-medium text-slate-500">Volume da scaldare [m³]</span>
             <input type="number" min="0" step="10" className={inputCls} value={verifica.volumeM3} onChange={(e) => set("volumeM3", Number(e.target.value))} />
           </label>
-          <label className="block">
-            <span className="text-xs font-medium text-slate-500">Altezza dei locali [m]</span>
+          <label className={`block ${falde && TIPI_EDIFICIO[verifica.tipoEdificio]?.piani === 1 ? "hidden" : ""}`}>
+            <span className="text-xs font-medium text-slate-500">{falde ? "Altezza dei piani sotto [m]" : "Altezza dei locali [m]"}</span>
             <input type="number" min="2" step="0.05" className={inputCls} value={verifica.altezzaM} onChange={(e) => set("altezzaM", Number(e.target.value))} />
-            <span className="text-[11px] text-slate-400">superficie: {verifica.altezzaM > 0 ? Math.round(verifica.volumeM3 / verifica.altezzaM) : "—"} m²</span>
+            <span className="text-[11px] text-slate-400">superficie: {superficieTotale > 0 ? Math.round(superficieTotale) : "—"} m²</span>
           </label>
           <label className="block">
             <span className="text-xs font-medium text-slate-500">Che edificio è?</span>
@@ -136,6 +168,59 @@ export default function VerificaPotenzaForm({ verifica, onChange, comune, edific
               ))}
             </select>
           </label>
+          {conTetto && (
+            <label className="block">
+              <span className="text-xs font-medium text-slate-500">Soffitto dell'ultimo piano</span>
+              <select
+                className={inputCls}
+                value={verifica.soffitto ?? "piano"}
+                onChange={(e) =>
+                  onChange({
+                    ...verifica,
+                    soffitto: e.target.value,
+                    // Proposta di partenza, da sostituire con le misure vere.
+                    altezzaImpostaM: verifica.altezzaImpostaM ?? verifica.altezzaM,
+                    altezzaColmoM: verifica.altezzaColmoM ?? Math.round((verifica.altezzaM + 1.5) * 100) / 100,
+                  })
+                }
+              >
+                <option value="piano">Piano</option>
+                <option value="dueFalde">Inclinato, tetto a due falde</option>
+              </select>
+            </label>
+          )}
+          {falde && (
+            <>
+              <label className="block">
+                <span className="text-xs font-medium text-slate-500">Altezza all'imposta [m]</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.05"
+                  className={inputCls}
+                  value={verifica.altezzaImpostaM ?? ""}
+                  onChange={(e) => set("altezzaImpostaM", e.target.value === "" ? null : Number(e.target.value))}
+                />
+                <span className="text-[11px] text-slate-400">la più bassa, lungo i muri sotto la gronda</span>
+              </label>
+              <label className="block">
+                <span className="text-xs font-medium text-slate-500">Altezza al colmo [m]</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.05"
+                  className={inputCls}
+                  value={verifica.altezzaColmoM ?? ""}
+                  onChange={(e) => set("altezzaColmoM", e.target.value === "" ? null : Number(e.target.value))}
+                />
+                <span className="text-[11px] text-slate-400">
+                  {geoUltimo?.inclinato
+                    ? `media ${geoUltimo.altezzaMedia.toFixed(2)} m, falde ${Math.round(geoUltimo.superficieCopertura)} m²`
+                    : "deve superare l'altezza all'imposta"}
+                </span>
+              </label>
+            </>
+          )}
         </div>
       )}
 

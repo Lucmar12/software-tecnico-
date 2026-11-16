@@ -21,7 +21,7 @@
  */
 import { TRASMITTANZE_PER_EPOCA, COEFF_CALORE_LATENTE_W_PER_MCH_G, kwToBtu, scegliTagliaCommerciale } from "../data/calculations.js";
 import { parametro, parametriSovrascritti, CAPACITA_TERMICA_ARIA } from "./parametriCalcolo.js";
-import { normalizzaGeometria } from "./stime.js";
+import { normalizzaGeometria, geometriaSoffitto } from "./stime.js";
 import { ORE_DI_CALCOLO, quotaIrraggiamento, temperaturaEsternaOraria, profiloEstivoEdificio } from "./profiliOrari.js";
 
 /** Trasmittanze effettivamente in uso per l'ambiente: override manuale se presente, altrimenti valore da epoca costruttiva. */
@@ -94,13 +94,17 @@ export function calcolaAmbienteConOverride(ambienteGrezzo, comune) {
   const deltaTInvMuroEffettivo = deltaTInv * (1 - frazioneNonRiscaldata * (1 - fattoreB));
   const Q_muri = U.muro * superficieMuroNetta * deltaTInvMuroEffettivo;
   const Q_vetri = U.vetro * ambiente.superficieFinestre * deltaTInv;
-  const Q_tetto = ambiente.ultimoPiano ? U.tetto * ambiente.superficiePavimento * deltaTInv : 0;
+  // Con il soffitto a falde il tetto è inclinato e più esteso del
+  // pavimento: disperde l'intera superficie delle falde.
+  const soffitto = geometriaSoffitto(ambiente);
+  const Q_tetto = ambiente.ultimoPiano ? U.tetto * soffitto.superficieCopertura * deltaTInv : 0;
   const Q_pavimento = ambiente.pianoTerra ? U.pavimento * ambiente.superficiePavimento * deltaTInv * coeffPavimento : 0;
   const trasmissioneBaseW = (Q_muri + Q_vetri + Q_tetto + Q_pavimento) * fattoreEsp * fattorePiano;
   // Maggiorazione per ponti termici lineari, applicata sul totale della dispersione per trasmissione.
   const trasmissioneW = trasmissioneBaseW * (1 + maggiorazionePontiTermici);
 
-  const volumeAmbiente = ambiente.superficiePavimento * ambiente.altezza;
+  // Volume d'aria sull'altezza media: sotto le falde è più alta dell'imposta.
+  const volumeAmbiente = ambiente.superficiePavimento * soffitto.altezzaMedia;
   const ventilazioneW = CAPACITA_TERMICA_ARIA * ricambiAriaOra * volumeAmbiente * deltaTInv;
   const invernaleKw = (trasmissioneW + ventilazioneW) / 1000;
 
@@ -170,6 +174,8 @@ export function calcolaAmbienteConOverride(ambienteGrezzo, comune) {
     frazioneNonRiscaldata,
     incrementoSoleAria,
     portataRinnovoMch,
+    volumeAmbiente,
+    soffitto,
     profiloEstivo,
     oraDiPunta: puntaEstiva.ora,
     scomposizioneEstiva: {

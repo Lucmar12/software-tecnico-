@@ -126,7 +126,17 @@ export default function DettaglioCalcolo({ risultato, comune, defaultOpen = fals
               <h4 className="font-semibold text-slate-700 mb-1">Dispersione per trasmissione (UNI EN 12831)</h4>
               <Riga label="Componente muri" value={`${componentiInvolucro.muri.kw.toFixed(3)} kW (${componentiInvolucro.muri.pct.toFixed(0)}%)`} />
               <Riga label="Componente serramenti" value={`${componentiInvolucro.vetri.kw.toFixed(3)} kW (${componentiInvolucro.vetri.pct.toFixed(0)}%)`} />
-              <Riga label="Componente copertura" value={`${componentiInvolucro.tetto.kw.toFixed(3)} kW (${componentiInvolucro.tetto.pct.toFixed(0)}%)`} nota={ambiente.ultimoPiano ? "ambiente all'ultimo piano" : "non applicabile"} />
+              <Riga
+                label="Componente copertura"
+                value={`${componentiInvolucro.tetto.kw.toFixed(3)} kW (${componentiInvolucro.tetto.pct.toFixed(0)}%)`}
+                nota={
+                  !ambiente.ultimoPiano
+                    ? "non applicabile"
+                    : risultato.soffitto.inclinato
+                    ? `ultimo piano, tetto a due falde: ${risultato.soffitto.superficieCopertura.toFixed(1)} m² di falde contro ${ambiente.superficiePavimento} m² di pavimento`
+                    : "ambiente all'ultimo piano"
+                }
+              />
               <Riga label="Componente pavimento contro terra" value={`${componentiInvolucro.pavimento.kw.toFixed(3)} kW (${componentiInvolucro.pavimento.pct.toFixed(0)}%)`} nota={ambiente.pianoTerra ? "ambiente a piano terra, coeff. 0,7" : "non applicabile"} />
               <Riga label="Fattore correttivo esposizione" value={`× ${FATTORE_ESPOSIZIONE[ambiente.esposizionePrevalente]}`} nota={`esposizione ${ambiente.esposizionePrevalente}`} />
               <Riga label="Fattore correttivo posizione in edificio" value={`× ${ambiente.ultimoPiano ? "1,15 (ultimo piano)" : ambiente.pianoTerra ? "1,10 (piano terra)" : "1,00 (piano intermedio)"}`} />
@@ -152,7 +162,15 @@ export default function DettaglioCalcolo({ risultato, comune, defaultOpen = fals
                 value={`${ricambiAriaOra} vol/h`}
                 nota={`${ETICHETTE_TIPO_LOCALE[ambiente.tipoLocale] || ETICHETTE_TIPO_LOCALE.altro}, uso residenziale UNI 10339`}
               />
-              <Riga label="Volume ambiente" value={`${(ambiente.superficiePavimento * ambiente.altezza).toFixed(1)} m³`} />
+              <Riga
+                label="Volume ambiente"
+                value={`${risultato.volumeAmbiente.toFixed(1)} m³`}
+                nota={
+                  risultato.soffitto.inclinato
+                    ? `soffitto a due falde: altezza media ${risultato.soffitto.altezzaMedia.toFixed(2)} m (imposta ${risultato.soffitto.altezzaImposta} m, colmo ${risultato.soffitto.altezzaColmo} m)`
+                    : null
+                }
+              />
               <Riga label="Totale dispersione per ventilazione" value={`${scomposizioneInvernale.ventilazioneKw.toFixed(3)} kW (${scomposizioneInvernale.quotaVentilazionePct.toFixed(0)}% del carico invernale)`} />
             </div>
 

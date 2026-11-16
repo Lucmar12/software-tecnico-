@@ -28,6 +28,7 @@ import { nuovoAmbiente } from "./modelli.js";
 import { calcolaEdificioConOverride } from "./overrides.js";
 import { calcolaFattoreDeratingBassaTemperatura } from "./deratingPompaDiCalore.js";
 import { MARGINE_POTENZA } from "./biomassa.js";
+import { calcolaSuperficieMuriEsterni } from "./stime.js";
 
 /**
  * Edifici tipo per la stima da volume. Ogni piano è un ambiente
@@ -84,32 +85,64 @@ export const IPOTESI_EDIFICIO_EQUIVALENTE = {
 /** Lati del perimetro esposti per configurazione, su una pianta quadrata. */
 const LATI_ESPOSTI = { tutti: 4, tre: 3, angolo: 2, latoLungo: 1, latoCorto: 1 };
 
+/** Il piano più alto può stare sotto il tetto solo se l'edificio ha un tetto. */
+export function haTetto(tipoEdificio) {
+  return !(TIPI_EDIFICIO[tipoEdificio] ?? TIPI_EDIFICIO.casaDuePiani).nessunTetto;
+}
+
 /**
  * Costruisce gli ambienti dell'edificio equivalente.
- * Il volume si conserva esattamente: Σ superficie × altezza = volume.
+ * Il volume si conserva esattamente: Σ superficie × altezza media = volume.
+ *
+ * Con `soffitto: "dueFalde"` l'ultimo piano sta sotto un tetto a due
+ * falde: all'imposta è alto `altezzaImpostaM`, al colmo `altezzaColmoM`,
+ * e il suo volume è la superficie per l'altezza media. A parità di volume
+ * la pianta si restringe, il tetto inclinato è più esteso del pavimento e
+ * metà dei muri esposti sono timpani: è il motore degli ambienti a farne
+ * il conto, con la stessa geometria della tabella.
  */
-export function edificioEquivalente({ volumeM3, altezzaM = 2.7, tipoEdificio = "casaDuePiani", epocaCostruttiva = "1976-1990" }) {
+export function edificioEquivalente({
+  volumeM3,
+  altezzaM = 2.7,
+  tipoEdificio = "casaDuePiani",
+  epocaCostruttiva = "1976-1990",
+  soffitto = "piano",
+  altezzaImpostaM = null,
+  altezzaColmoM = null,
+}) {
   const tipo = TIPI_EDIFICIO[tipoEdificio] ?? TIPI_EDIFICIO.casaDuePiani;
-  const superficieTotale = volumeM3 / altezzaM;
-  const superficiePiano = superficieTotale / tipo.piani;
+  const imposta = Number(altezzaImpostaM) > 0 ? Number(altezzaImpostaM) : altezzaM;
+  const falde = soffitto === "dueFalde" && haTetto(tipoEdificio) && Number(altezzaColmoM) > imposta;
+  const altezzaUltimo = falde ? imposta : altezzaM;
+  const altezzaMediaUltimo = falde ? (imposta + Number(altezzaColmoM)) / 2 : altezzaM;
+  const superficiePiano = volumeM3 / ((tipo.piani - 1) * altezzaM + altezzaMediaUltimo);
   const lato = Math.sqrt(superficiePiano);
   const lati = LATI_ESPOSTI[tipo.paretiEsterne] ?? 4;
 
   return Array.from({ length: tipo.piani }, (_, i) => {
     const primo = i === 0;
     const ultimo = i === tipo.piani - 1;
+    const sottoFalde = ultimo && falde;
+    const altezza = sottoFalde ? altezzaUltimo : altezzaM;
+    const geometria = {
+      lunghezzaM: lato,
+      larghezzaM: lato,
+      altezza,
+      paretiEsterne: tipo.paretiEsterne,
+      soffitto: sottoFalde ? "dueFalde" : "piano",
+      altezzaColmo: sottoFalde ? Number(altezzaColmoM) : null,
+    };
     return nuovoAmbiente({
       nome: tipo.piani > 1 ? `Piano ${i === 0 ? "terra" : i}` : "Abitazione",
       tipoLocale: IPOTESI_EDIFICIO_EQUIVALENTE.tipoLocale,
       esposizionePrevalente: IPOTESI_EDIFICIO_EQUIVALENTE.esposizione,
       epocaCostruttiva,
-      altezza: altezzaM,
-      lunghezzaM: lato,
-      larghezzaM: lato,
-      paretiEsterne: tipo.paretiEsterne,
+      ...geometria,
       // Superfici date esplicitamente, fuori dal ricalcolo automatico:
       // l'edificio equivalente è definito dalle sue ipotesi, non da stime.
-      superficieMuriEsterni: lati * lato * altezzaM,
+      // Con il soffitto piano vale lati × lato × altezza; sotto le falde
+      // metà dei lati esposti sono timpani, alti in media.
+      superficieMuriEsterni: sottoFalde ? calcolaSuperficieMuriEsterni(geometria) : lati * lato * altezzaM,
       superficieFinestre: superficiePiano * IPOTESI_EDIFICIO_EQUIVALENTE.quotaVetrata,
       campiStimati: ["numeroOccupanti"],
       pianoTerra: primo && !tipo.nessunPavimento,
@@ -119,8 +152,8 @@ export function edificioEquivalente({ volumeM3, altezzaM = 2.7, tipoEdificio = "
 }
 
 /** Carico invernale dell'edificio equivalente. */
-export function caricoDaVolume({ volumeM3, altezzaM, tipoEdificio, epocaCostruttiva, comune }) {
-  const ambienti = edificioEquivalente({ volumeM3, altezzaM, tipoEdificio, epocaCostruttiva });
+export function caricoDaVolume({ volumeM3, altezzaM, tipoEdificio, epocaCostruttiva, soffitto, altezzaImpostaM, altezzaColmoM, comune }) {
+  const ambienti = edificioEquivalente({ volumeM3, altezzaM, tipoEdificio, epocaCostruttiva, soffitto, altezzaImpostaM, altezzaColmoM });
   const edificio = calcolaEdificioConOverride(ambienti, comune);
   return { caricoKw: edificio.totaleInvernaleKw, edificio, ambienti };
 }
@@ -135,12 +168,14 @@ export const TIPI_GENERATORE = {
     etichetta: "Termostufa o termocamino idro a pellet",
     margine: MARGINE_POTENZA.pellet,
     derating: false,
+    idro: true,
     nota: "Una parte della potenza nominale scalda il locale in cui è installato, il resto l'acqua dei termosifoni: controlla sulla scheda la potenza resa all'acqua.",
   },
   biomassa_idro_legna: {
     etichetta: "Termostufa o termocamino idro a legna",
     margine: MARGINE_POTENZA.legna,
     derating: false,
+    idro: true,
     nota: "Una parte della potenza nominale scalda il locale in cui è installato, il resto l'acqua dei termosifoni: controlla sulla scheda la potenza resa all'acqua. La legna non modula: sovradimensionata lavora a fiamma bassa, con combustione peggiore.",
   },
   pompa_di_calore: {
@@ -162,15 +197,23 @@ export const TIPI_GENERATORE = {
  *
  * @param {object} p
  * @param {number} p.potenzaKw       potenza nominale dichiarata
+ * @param {number|null} p.potenzaAcquaKw  per le macchine idro, la potenza
+ *                                   resa all'acqua dichiarata in scheda: è
+ *                                   quella che arriva ai termosifoni, e se
+ *                                   c'è si verifica quella. Il resto scalda
+ *                                   solo il locale di installazione.
  * @param {number} p.caricoKw        carico invernale da coprire
  * @param {string} p.tipoGeneratore  chiave di TIPI_GENERATORE
  * @param {object} p.comune
  * @param {number|null} p.volumeM3   se noto, per ricavare il volume servibile
  */
-export function verificaPotenza({ potenzaKw, caricoKw, tipoGeneratore, comune, volumeM3 = null }) {
+export function verificaPotenza({ potenzaKw, potenzaAcquaKw = null, caricoKw, tipoGeneratore, comune, volumeM3 = null }) {
   const tipo = TIPI_GENERATORE[tipoGeneratore] ?? TIPI_GENERATORE.biomassa_idro_pellet;
   const fattoreDerating = tipo.derating ? calcolaFattoreDeratingBassaTemperatura(comune.teInv) : 1;
-  const potenzaEffettivaKw = potenzaKw * fattoreDerating;
+  // Resa all'acqua oltre la nominale non è possibile: in quel caso è un
+  // errore di inserimento e si resta sulla nominale.
+  const acqua = tipo.idro && Number(potenzaAcquaKw) > 0 && Number(potenzaAcquaKw) <= potenzaKw ? Number(potenzaAcquaKw) : null;
+  const potenzaEffettivaKw = acqua ?? potenzaKw * fattoreDerating;
   const copertura = caricoKw > 0 ? potenzaEffettivaKw / caricoKw : Infinity;
 
   let esito;
@@ -187,6 +230,7 @@ export function verificaPotenza({ potenzaKw, caricoKw, tipoGeneratore, comune, v
   return {
     tipo,
     potenzaKw,
+    potenzaAcquaKw: acqua,
     fattoreDerating,
     potenzaEffettivaKw,
     caricoKw,
@@ -202,6 +246,8 @@ export function verificaPotenza({ potenzaKw, caricoKw, tipoGeneratore, comune, v
 export function nuovaVerificaPotenza(overrides = {}) {
   return {
     potenzaKw: 26,
+    // Resa all'acqua dalla scheda tecnica; vuota = si usa la nominale.
+    potenzaAcquaKw: null,
     tipoGeneratore: "biomassa_idro_pellet",
     // "volume": stima da volume, tipo di edificio ed epoca;
     // "ambienti": carico completo dagli ambienti della tabella.
@@ -210,6 +256,10 @@ export function nuovaVerificaPotenza(overrides = {}) {
     altezzaM: 2.7,
     tipoEdificio: "casaDuePiani",
     epocaCostruttiva: "1976-1990",
+    // Ultimo piano sotto un tetto a due falde.
+    soffitto: "piano",
+    altezzaImpostaM: null,
+    altezzaColmoM: null,
     ...overrides,
   };
 }
@@ -226,7 +276,7 @@ export function eseguiVerifica({ verifica, comune, edificio }) {
 
   const caricoKw = daAmbienti ? edificio.totaleInvernaleKw : caricoDaVolume({ ...verifica, comune }).caricoKw;
   const volumeM3 = daAmbienti
-    ? edificio.risultatiAmbienti.reduce((s, r) => s + r.ambiente.superficiePavimento * r.ambiente.altezza, 0)
+    ? edificio.risultatiAmbienti.reduce((s, r) => s + r.volumeAmbiente, 0)
     : verifica.volumeM3;
-  return { ...verificaPotenza({ potenzaKw: verifica.potenzaKw, caricoKw, tipoGeneratore: verifica.tipoGeneratore, comune, volumeM3 }), volumeM3, daAmbienti };
+  return { ...verificaPotenza({ potenzaKw: verifica.potenzaKw, potenzaAcquaKw: verifica.potenzaAcquaKw, caricoKw, tipoGeneratore: verifica.tipoGeneratore, comune, volumeM3 }), volumeM3, daAmbienti };
 }

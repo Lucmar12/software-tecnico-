@@ -112,7 +112,68 @@ export function normalizzaGeometria(ambiente) {
   }
 
   a.superficiePavimento = arrotonda(Number(a.lunghezzaM) * Number(a.larghezzaM), 2);
+  if (a.soffitto !== "dueFalde") {
+    a.soffitto = "piano";
+    a.altezzaColmo = null;
+  }
   return a;
+}
+
+/**
+ * SOFFITTO INCLINATO A DUE FALDE (mansarda, ultimo piano sotto tetto).
+ *
+ * Con il soffitto piano un'altezza basta. Con le falde no: l'altezza va
+ * dall'imposta, lungo i due muri lunghi, al colmo al centro della stanza,
+ * e questo cambia tre cose del calcolo:
+ *   - il volume d'aria, che è superficie × altezza MEDIA, non × altezza
+ *     all'imposta;
+ *   - i muri: quelli lunghi sono alti quanto l'imposta, quelli corti sono
+ *     timpani, un rettangolo più un triangolo;
+ *   - il tetto, che è inclinato e quindi più esteso del pavimento che
+ *     copre: è quella la superficie che disperde.
+ *
+ * Il colmo si assume parallelo al lato lungo, a metà della larghezza: è
+ * la disposizione più comune, e con la pianta quadrata dell'edificio
+ * equivalente le due disposizioni coincidono.
+ */
+export const TIPI_SOFFITTO = [
+  { value: "piano", label: "Piano" },
+  { value: "dueFalde", label: "Inclinato a due falde" },
+];
+
+/** Lati lunghi e lati corti esposti, per configurazione delle pareti esterne. */
+const LATI_PER_CONFIGURAZIONE = {
+  latoCorto: { lunghi: 0, corti: 1 },
+  latoLungo: { lunghi: 1, corti: 0 },
+  angolo: { lunghi: 1, corti: 1 },
+  tre: { lunghi: 1, corti: 2 },
+  tutti: { lunghi: 2, corti: 2 },
+};
+
+/**
+ * Geometria del soffitto di un ambiente.
+ *
+ * @returns {{inclinato:boolean, altezzaImposta:number, altezzaColmo:number, salita:number,
+ *            altezzaMedia:number, altezzaMediaTimpano:number, superficieCopertura:number}}
+ */
+export function geometriaSoffitto({ lunghezzaM, larghezzaM, altezza, soffitto, altezzaColmo }) {
+  const L = Math.max(Number(lunghezzaM) || 0, Number(larghezzaM) || 0);
+  const W = Math.min(Number(lunghezzaM) || 0, Number(larghezzaM) || 0);
+  const h = Number(altezza) || 0;
+  const inclinato = soffitto === "dueFalde" && Number(altezzaColmo) > h;
+  const salita = inclinato ? Number(altezzaColmo) - h : 0;
+  // Ogni falda copre metà della larghezza e sale di `salita`: la sua
+  // larghezza vera è l'ipotenusa.
+  const larghezzaFalda = Math.sqrt((W / 2) ** 2 + salita ** 2);
+  return {
+    inclinato,
+    altezzaImposta: h,
+    altezzaColmo: h + salita,
+    salita,
+    altezzaMedia: h + salita / 2,
+    altezzaMediaTimpano: h + salita / 2,
+    superficieCopertura: inclinato ? 2 * L * larghezzaFalda : L * W,
+  };
 }
 
 /** Sviluppo lineare delle pareti che affacciano sull'esterno [m]. */
@@ -204,15 +265,21 @@ function arrotonda(valore, decimali = 1) {
 }
 
 /**
- * Superficie lorda dei muri che affacciano sull'esterno [m²]: sviluppo
- * lineare delle pareti esposte per l'altezza interna. Con le dimensioni
- * in pianta note è un calcolo esatto, non una stima.
+ * Superficie lorda dei muri che affacciano sull'esterno [m²]. Con le
+ * dimensioni in pianta note è un calcolo esatto, non una stima.
+ *
+ * Con il soffitto piano è lo sviluppo per l'altezza. Con le falde i muri
+ * lunghi sono alti quanto l'imposta e quelli corti sono timpani, alti in
+ * media imposta + metà della salita al colmo.
  */
-export function calcolaSuperficieMuriEsterni({ lunghezzaM, larghezzaM, altezza, paretiEsterne }) {
+export function calcolaSuperficieMuriEsterni({ lunghezzaM, larghezzaM, altezza, paretiEsterne, soffitto = "piano", altezzaColmo = null }) {
   const h = Number(altezza);
-  const sviluppo = sviluppoParetiEsterne({ lunghezzaM, larghezzaM, paretiEsterne });
-  if (!(h > 0) || !(sviluppo > 0)) return 0;
-  return arrotonda(sviluppo * h);
+  const L = Math.max(Number(lunghezzaM) || 0, Number(larghezzaM) || 0);
+  const W = Math.min(Number(lunghezzaM) || 0, Number(larghezzaM) || 0);
+  if (!(h > 0) || !(L > 0) || !(W > 0)) return 0;
+  const lati = LATI_PER_CONFIGURAZIONE[paretiEsterne] ?? LATI_PER_CONFIGURAZIONE[CONFIGURAZIONE_PARETI_DEFAULT];
+  const { altezzaMediaTimpano } = geometriaSoffitto({ lunghezzaM, larghezzaM, altezza, soffitto, altezzaColmo });
+  return arrotonda(lati.lunghi * L * h + lati.corti * W * altezzaMediaTimpano);
 }
 
 /**
@@ -257,6 +324,8 @@ export function applicaStime(ambiente) {
       larghezzaM: base.larghezzaM,
       altezza: base.altezza,
       paretiEsterne: base.paretiEsterne,
+      soffitto: base.soffitto,
+      altezzaColmo: base.altezzaColmo,
     });
   }
 

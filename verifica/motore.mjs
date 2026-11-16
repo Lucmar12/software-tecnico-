@@ -17,6 +17,7 @@
 
 import { calcolaAmbienteConOverride, calcolaEdificioConOverride } from "../src/utils/overrides.js";
 import { nuovoAmbiente } from "../src/utils/modelli.js";
+import { validaAmbiente } from "../src/utils/validazione.js";
 import { calcolaDimensionamentoVRF } from "../src/utils/vrf.js";
 import { calcolaDimensionamentoChiller } from "../src/utils/chiller.js";
 import { calcolaAutoclave, calcolaCircolazione, kwToCv, KW_PER_CV } from "../src/utils/pompeIdrauliche.js";
@@ -45,7 +46,7 @@ import { dimensionaBiomassa, ambientiServiti, descrizioneApparecchio, POTENZA_MI
 import { oreEquivalentiRiscaldamento } from "../src/utils/fotovoltaico.js";
 import { edificioEquivalente, caricoDaVolume, verificaPotenza, eseguiVerifica, nuovaVerificaPotenza } from "../src/utils/verificaPotenza.js";
 import { MONOSPLIT_AUX, LIGHT_COMMERCIAL_AUX, UNITA_INTERNE_MULTI_AUX, UNITA_ESTERNE_MULTI_AUX, capacitaGarantita, prezzoSistema } from "../src/data/gammaAux.js";
-import { calcolaSuperficieMuriEsterni, sviluppoParetiEsterne, areaFinestra, normalizzaGeometria } from "../src/utils/stime.js";
+import { calcolaSuperficieMuriEsterni, sviluppoParetiEsterne, areaFinestra, normalizzaGeometria, geometriaSoffitto } from "../src/utils/stime.js";
 import { ORE_DI_CALCOLO, quotaIrraggiamento, temperaturaEsternaOraria, ESCURSIONE_DEFAULT_K } from "../src/utils/profiliOrari.js";
 
 let passati = 0;
@@ -850,6 +851,76 @@ function ambienteRiferimento(extra = {}) {
   const daAmbienti = eseguiVerifica({ verifica: nuovaVerificaPotenza({ modalita: "ambienti", potenzaKw: 1 }), comune: COMUNE, edificio: edificioVero });
   uguale("dagli ambienti usa il carico calcolato stanza per stanza [kW]", daAmbienti.caricoKw, edificioVero.totaleInvernaleKw, 1e-12);
   uguale("e il volume vero degli ambienti [m³]", daAmbienti.volumeM3, 5 * 4 * 2.7, 1e-9);
+}
+
+// ---------------------------------------------------------------------
+// SOFFITTO A DUE FALDE — mansarde e ultimi piani sotto il tetto
+// ---------------------------------------------------------------------
+{
+  // Stanza 5 × 4 m, imposta 2,70, colmo 4,20 → salita 1,50 m
+  //   altezza media = 2,70 + 1,50/2 = 3,45 m · volume = 20 × 3,45 = 69 m³
+  //   ogni falda: larga √(2² + 1,5²) = 2,5 m, lunga 5 m → falde = 2 × 5 × 2,5 = 25 m²
+  //   muri, tutti i lati esposti: 2 lunghi × 5 × 2,70 + 2 timpani × 4 × 3,45 = 27 + 27,6 = 54,6 m²
+  const g = geometriaSoffitto({ lunghezzaM: 5, larghezzaM: 4, altezza: 2.7, soffitto: "dueFalde", altezzaColmo: 4.2 });
+  uguale("falde: altezza media [m]", g.altezzaMedia, 3.45, 1e-12);
+  uguale("falde: superficie del tetto inclinato [m²]", g.superficieCopertura, 25, 1e-12);
+  uguale(
+    "falde: muri esterni con i timpani [m²]",
+    calcolaSuperficieMuriEsterni({ lunghezzaM: 5, larghezzaM: 4, altezza: 2.7, paretiEsterne: "tutti", soffitto: "dueFalde", altezzaColmo: 4.2 }),
+    54.6,
+    1e-9
+  );
+  // Soffitto piano: esattamente come prima delle falde.
+  const piano = geometriaSoffitto({ lunghezzaM: 5, larghezzaM: 4, altezza: 2.7, soffitto: "piano", altezzaColmo: 4.2 });
+  vero("soffitto piano: copertura = pavimento, altezza media = altezza", piano.superficieCopertura === 20 && piano.altezzaMedia === 2.7 && !piano.inclinato);
+  vero("colmo non sopra l'imposta: resta piano", !geometriaSoffitto({ lunghezzaM: 5, larghezzaM: 4, altezza: 2.7, soffitto: "dueFalde", altezzaColmo: 2.7 }).inclinato);
+
+  // Nel motore: volume dalla media, tetto dalle falde. Il carico del tetto
+  // cresce nel rapporto 25/20 rispetto alla stessa stanza col soffitto piano.
+  const base = { ultimoPiano: true, paretiEsterne: "tutti", altezza: 2.7 };
+  const rPiano = calcolaAmbienteConOverride(ambienteRiferimento(base), COMUNE);
+  const rFalde = calcolaAmbienteConOverride(ambienteRiferimento({ ...base, soffitto: "dueFalde", altezzaColmo: 4.2 }), COMUNE);
+  uguale("falde nel motore: volume dell'ambiente [m³]", rFalde.volumeAmbiente, 69, 1e-9);
+  uguale("soffitto piano nel motore: volume invariato [m³]", rPiano.volumeAmbiente, 54, 1e-9);
+  vero("falde: muri ricalcolati con i timpani", ambienteRiferimento({ ...base, soffitto: "dueFalde", altezzaColmo: 4.2 }).superficieMuriEsterni === 54.6);
+
+  // Validazione
+  vero("colmo sotto l'imposta: errore", !!validaAmbiente(ambienteRiferimento({ soffitto: "dueFalde", altezzaColmo: 2.5 })).altezzaColmo);
+  vero("colmo plausibile: nessun errore", !validaAmbiente(ambienteRiferimento({ soffitto: "dueFalde", altezzaColmo: 4.2 })).altezzaColmo);
+
+  // --- Edificio equivalente con l'ultimo piano sotto le falde ---
+  // Casa su un piano, 500 m³, imposta 3,00, colmo 4,80 → media 3,90 m
+  //   superficie = 500 / 3,90 = 128,205 m², lato = 11,3228 m
+  //   muri = 2 × 11,3228 × 3,00 + 2 × 11,3228 × 3,90 = 156,25 m²
+  //   falde = 2 × 11,3228 × √(5,6614² + 1,8²) = 134,52 m²
+  const sottoTetto = edificioEquivalente({ volumeM3: 500, tipoEdificio: "casaUnPiano", soffitto: "dueFalde", altezzaImpostaM: 3, altezzaColmoM: 4.8 });
+  const lato = Math.sqrt(500 / 3.9);
+  uguale("casa sotto le falde: superficie [m²]", sottoTetto[0].superficiePavimento, 500 / 3.9, 0.01);
+  // I muri sono arrotondati al decimo di m², come tutte le superfici stimate.
+  uguale("casa sotto le falde: muri con i timpani [m²]", sottoTetto[0].superficieMuriEsterni, 2 * lato * 3 + 2 * lato * 3.9, 0.05);
+  const rCasa = calcolaEdificioConOverride(sottoTetto, COMUNE).risultatiAmbienti[0];
+  uguale("casa sotto le falde: volume conservato [m³]", rCasa.volumeAmbiente, 500, 0.1);
+  uguale("casa sotto le falde: superficie del tetto [m²]", rCasa.soffitto.superficieCopertura, 2 * lato * Math.sqrt((lato / 2) ** 2 + 1.8 ** 2), 0.05);
+  // Su due piani le falde toccano solo il piano alto: 500 = S × (2,70 + 3,90)
+  const dueP = edificioEquivalente({ volumeM3: 500, tipoEdificio: "casaDuePiani", soffitto: "dueFalde", altezzaImpostaM: 3, altezzaColmoM: 4.8 });
+  vero("due piani: falde solo sull'ultimo", dueP[0].soffitto === "piano" && dueP[1].soffitto === "dueFalde");
+  uguale("due piani: superficie per piano [m²]", dueP[0].superficiePavimento, 500 / 6.6, 0.01);
+  vero("appartamento intermedio: le falde non si applicano", edificioEquivalente({ volumeM3: 300, tipoEdificio: "appartamentoIntermedio", soffitto: "dueFalde", altezzaColmoM: 4.8 }).every((a) => a.soffitto === "piano"));
+
+  // --- Potenza resa all'acqua ---
+  // 26 kW nominali, 24,6 all'acqua, carico 20 kW: si verifica 24,6 → 123%, adeguata col pellet
+  const acqua = verificaPotenza({ potenzaKw: 26, potenzaAcquaKw: 24.6, caricoKw: 20, tipoGeneratore: "biomassa_idro_pellet", comune: COMUNE, volumeM3: 500 });
+  uguale("idro: si verifica la potenza all'acqua [kW]", acqua.potenzaEffettivaKw, 24.6, 1e-12);
+  ugualeTesto("idro: 24,6 su 20 è adeguata", acqua.esito, "adeguata");
+  uguale("idro: volume massimo con la resa all'acqua [m³]", acqua.volumeMassimoM3, 24.6 / 0.04, 1e-9);
+  uguale("resa all'acqua oltre la nominale: ignorata [kW]", verificaPotenza({ potenzaKw: 26, potenzaAcquaKw: 30, caricoKw: 20, tipoGeneratore: "biomassa_idro_pellet", comune: COMUNE }).potenzaEffettivaKw, 26, 1e-12);
+  uguale("caldaia: la resa all'acqua non cambia nulla [kW]", verificaPotenza({ potenzaKw: 26, potenzaAcquaKw: 20, caricoKw: 20, tipoGeneratore: "caldaia", comune: COMUNE }).potenzaEffettivaKw, 26, 1e-12);
+  uguale(
+    "eseguiVerifica passa la resa all'acqua [kW]",
+    eseguiVerifica({ verifica: nuovaVerificaPotenza({ potenzaAcquaKw: 24.6 }), comune: COMUNE, edificio: null }).potenzaEffettivaKw,
+    24.6,
+    1e-12
+  );
 }
 
 // ---------------------------------------------------------------------

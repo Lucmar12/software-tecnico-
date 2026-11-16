@@ -18,7 +18,22 @@ export function validaAmbiente(ambiente) {
 
   if (!(ambiente.numeroFinestre >= 0)) errori.numeroFinestre = "Il numero di finestre non può essere negativo.";
 
-  if (!(ambiente.altezza >= 2 && ambiente.altezza <= 4.5)) errori.altezza = "L'altezza interna deve essere compresa tra 2 e 4,5 m.";
+  if (!(ambiente.altezza >= 1 && ambiente.altezza <= 4.5)) {
+    errori.altezza =
+      ambiente.soffitto === "dueFalde"
+        ? "L'altezza all'imposta deve essere compresa tra 1 e 4,5 m."
+        : "L'altezza interna deve essere compresa tra 2 e 4,5 m.";
+  } else if (ambiente.soffitto !== "dueFalde" && ambiente.altezza < 2) {
+    errori.altezza = "L'altezza interna deve essere compresa tra 2 e 4,5 m.";
+  }
+
+  // Con il soffitto a falde l'imposta può scendere sotto i 2 m, ma il colmo
+  // deve stare sopra di essa: altrimenti non c'è nessuna falda.
+  if (ambiente.soffitto === "dueFalde") {
+    if (!(Number(ambiente.altezzaColmo) > Number(ambiente.altezza)))
+      errori.altezzaColmo = "Con il soffitto a falde l'altezza al colmo deve superare quella all'imposta.";
+    else if (Number(ambiente.altezzaColmo) > 9) errori.altezzaColmo = "Altezza al colmo non plausibile per un ambiente residenziale (> 9 m).";
+  }
 
   if (!(ambiente.superficieMuriEsterni >= 0)) errori.superficieMuriEsterni = "La superficie dei muri esterni non può essere negativa.";
 

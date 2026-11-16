@@ -49,7 +49,8 @@ export const COLONNE_AMBIENTI = [
     intestazione: "Alt.",
     unita: "m",
     origine: "inserito",
-    significato: "Altezza interna, da pavimento a soffitto. Con la superficie dà il volume d'aria da riscaldare o raffrescare.",
+    significato:
+      "Altezza interna, da pavimento a soffitto. Con la superficie dà il volume d'aria da riscaldare o raffrescare. Se il soffitto è inclinato a due falde è l'altezza all'imposta, la più bassa: l'altezza al colmo si inserisce nei Dettagli dell'ambiente.",
   },
   {
     chiave: "superficie",
