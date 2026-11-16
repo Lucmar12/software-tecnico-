@@ -1,7 +1,7 @@
 import React from "react";
 import { nuovoAmbiente, aggiornaCampoAmbiente, OPZIONI_EPOCA } from "../utils/modelli.js";
 import { validaAmbiente } from "../utils/validazione.js";
-import { calcolaAmbienteConOverride } from "../utils/overrides.js";
+import { calcolaAmbienteConOverride, calcolaEdificioConOverride } from "../utils/overrides.js";
 import { formattaKw } from "../utils/export.js";
 
 /**
@@ -98,16 +98,96 @@ function Domanda({ testo, aiuto, children, errore }) {
   );
 }
 
+/** Un "piano intero" della casa, usato nella modalità tutta insieme. */
+function pianoIntero(nome, superficie, base, extra = {}) {
+  const lato = Math.round(Math.sqrt(superficie) * 100) / 100;
+  return nuovoAmbiente({
+    nome,
+    casaIntera: true,
+    tipoLocale: "altro",
+    paretiEsterne: "tutti",
+    lunghezzaM: lato,
+    larghezzaM: lato,
+    numeroFinestre: Math.max(1, Math.round(superficie / 15)),
+    tipoFinestra: "dueAnte",
+    esposizionePrevalente: "est",
+    epocaCostruttiva: base.epocaCostruttiva ?? "1991-2005",
+    altezza: base.altezza ?? 2.7,
+    soffitto: base.soffitto ?? "piano",
+    altezzaColmo: base.altezzaColmo ?? null,
+    ...extra,
+  });
+}
+
 export default function AmbientiSemplici({ ambienti, onChange, comune }) {
   const primo = ambienti[0];
   const posizione = posizioneDa(ambienti);
   const duePiani = posizione === "casaDuePiani";
+  const intera = ambienti.length > 0 && ambienti.every((a) => a.casaIntera);
+
+  // Soffitto della casa: conta quello delle stanze sotto il tetto.
+  const sottoTetto = ambienti.filter((a) => a.ultimoPiano);
+  const conTetto = sottoTetto.length > 0;
+  const inclinato = conTetto && sottoTetto.some((a) => a.soffitto === "dueFalde");
+  const rifTetto = sottoTetto.find((a) => a.soffitto === "dueFalde") ?? sottoTetto[0];
+  const altezzaPiani = (ambienti.find((a) => !(inclinato && a.ultimoPiano)) ?? primo)?.altezza ?? 2.7;
+  const soloSottoTetto = ambienti.length > 0 && ambienti.every((a) => a.ultimoPiano);
+
+  const impostaSoffitto = (tipo) =>
+    onChange(
+      ambienti.map((a) => {
+        if (!a.ultimoPiano) return a;
+        if (tipo === "piano") return { ...aggiornaCampoAmbiente(a, "soffitto", "piano"), altezza: altezzaPiani };
+        const colmo = a.altezzaColmo > a.altezza ? a.altezzaColmo : Math.round((Number(a.altezza) + 1.5) * 100) / 100;
+        return aggiornaCampoAmbiente({ ...a, altezzaColmo: colmo }, "soffitto", "dueFalde");
+      })
+    );
+  const aSottoTetto = (campo, valore) => onChange(ambienti.map((a) => (a.ultimoPiano ? aggiornaCampoAmbiente(a, campo, valore) : a)));
+  const aiPiani = (valore) =>
+    onChange(ambienti.map((a) => (inclinato && a.ultimoPiano ? a : aggiornaCampoAmbiente(a, "altezza", valore))));
+
+  const passaAModalita = (m) => {
+    if (m === "intera" && !intera) {
+      const totale = ambienti.reduce((t, a) => t + (Number(a.superficiePavimento) || 0), 0) || 100;
+      const base = primo ?? {};
+      onChange(
+        duePiani
+          ? [
+              pianoIntero("Piano di sotto", totale / 2, { ...base, soffitto: "piano", altezzaColmo: null }, { pianoTerra: true, ultimoPiano: false, altezza: altezzaPiani }),
+              pianoIntero("Piano di sopra", totale / 2, rifTetto ?? base, { pianoTerra: false, ultimoPiano: true }),
+            ]
+          : [pianoIntero("Tutta la casa", totale, base, { pianoTerra: base.pianoTerra ?? false, ultimoPiano: base.ultimoPiano ?? false })]
+      );
+    }
+    if (m === "stanze" && intera) {
+      onChange(ambienti.map((a) => ({ ...a, casaIntera: false })));
+    }
+  };
+
+  // Totale della casa: superficie, volume e potenza, sempre in vista.
+  const tuttiValidi = ambienti.length > 0 && ambienti.every((a) => Object.keys(validaAmbiente(a)).length === 0);
+  const edificio = tuttiValidi && comune ? calcolaEdificioConOverride(ambienti, comune) : null;
+  const superficieTotale = ambienti.reduce((t, a) => t + (Number(a.superficiePavimento) || 0), 0);
+  const volumeTotale = edificio ? edificio.risultatiAmbienti.reduce((t, r) => t + r.volumeAmbiente, 0) : null;
 
   const aggiorna = (id, nuovo) => onChange(ambienti.map((a) => (a.id === id ? nuovo : a)));
   const aTutte = (campo, valore) => onChange(ambienti.map((a) => aggiornaCampoAmbiente(a, campo, valore)));
 
   const impostaPosizione = (valore) => {
     const p = POSIZIONI.find((x) => x.value === valore);
+    if (intera && Boolean(p.duePiani) !== duePiani) {
+      const totale = superficieTotale || 100;
+      const base = primo ?? {};
+      onChange(
+        p.duePiani
+          ? [
+              pianoIntero("Piano di sotto", totale / 2, base, { pianoTerra: true, ultimoPiano: false, soffitto: "piano", altezzaColmo: null }),
+              pianoIntero("Piano di sopra", totale / 2, base, { pianoTerra: false, ultimoPiano: true }),
+            ]
+          : [pianoIntero("Tutta la casa", totale, base, { pianoTerra: p.terra, ultimoPiano: p.ultimo })]
+      );
+      return;
+    }
     onChange(
       ambienti.map((a) => {
         if (p.duePiani) {
@@ -136,6 +216,23 @@ export default function AmbientiSemplici({ ambienti, onChange, comune }) {
   return (
     <div className="space-y-4">
       {/* Domande sulla casa, una volta sola */}
+      <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2">
+        <p className="font-bold text-slate-800 text-lg">Come vuoi descriverla?</p>
+        <Scelta
+          opzioni={[
+            { value: "intera", label: "Tutta la casa insieme" },
+            { value: "stanze", label: "Stanza per stanza" },
+          ]}
+          valore={intera ? "intera" : "stanze"}
+          onScegli={passaAModalita}
+        />
+        <p className="text-sm text-slate-500">
+          {intera
+            ? "Basta per una stufa o un camino collegato ai termosifoni, una caldaia o una pompa di calore unica: conta il totale della casa."
+            : "Serve per i climatizzatori, uno per stanza, e per una stufa ad aria che scalda solo alcune stanze."}
+        </p>
+      </div>
+
       <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-4">
         <p className="font-bold text-slate-800 text-lg">La casa</p>
         <Domanda testo="Quando è stata costruita?" aiuto="Se è stata isolata di recente (cappotto, infissi nuovi), scegli un periodo più recente.">
@@ -149,16 +246,55 @@ export default function AmbientiSemplici({ ambienti, onChange, comune }) {
         <Domanda testo="Che tipo di abitazione è?">
           <Scelta piccolo opzioni={POSIZIONI} valore={posizione} onScegli={impostaPosizione} />
         </Domanda>
-        <Domanda testo="Quanto sono alti i soffitti? (metri)" aiuto="Di solito 2,70. Se il soffitto è inclinato, usa la vista tecnica.">
-          <input
-            type="number"
-            step="0.05"
-            min="2"
-            className={`${inputCls} max-w-[10rem]`}
-            value={primo?.altezza ?? 2.7}
-            onChange={(e) => aTutte("altezza", Number(e.target.value))}
-          />
-        </Domanda>
+        {conTetto && (
+          <Domanda testo={duePiani ? "Com'è il soffitto del piano di sopra?" : "Com'è il soffitto?"}>
+            <Scelta
+              piccolo
+              opzioni={[
+                { value: "piano", label: "Piano, alto uguale dappertutto" },
+                { value: "dueFalde", label: "Inclinato, più alto al centro (tetto a due falde)" },
+              ]}
+              valore={inclinato ? "dueFalde" : "piano"}
+              onScegli={impostaSoffitto}
+            />
+          </Domanda>
+        )}
+        {!(inclinato && soloSottoTetto) && (
+          <Domanda testo={inclinato ? "Quanto sono alti i soffitti del piano di sotto? (metri)" : "Quanto sono alti i soffitti? (metri)"} aiuto="Di solito 2,70.">
+            <input
+              type="number"
+              step="0.05"
+              min="2"
+              className={`${inputCls} max-w-[10rem]`}
+              value={altezzaPiani}
+              onChange={(e) => aiPiani(Number(e.target.value))}
+            />
+          </Domanda>
+        )}
+        {inclinato && (
+          <div className="grid sm:grid-cols-2 gap-4">
+            <Domanda testo="Altezza sui muri, dove il soffitto è più basso (metri)">
+              <input
+                type="number"
+                step="0.05"
+                min="1"
+                className={`${inputCls} max-w-[10rem]`}
+                value={rifTetto?.altezza ?? ""}
+                onChange={(e) => aSottoTetto("altezza", Number(e.target.value))}
+              />
+            </Domanda>
+            <Domanda testo="Altezza al centro, nel punto più alto (metri)">
+              <input
+                type="number"
+                step="0.05"
+                min="1"
+                className={`${inputCls} max-w-[10rem]`}
+                value={rifTetto?.altezzaColmo ?? ""}
+                onChange={(e) => aSottoTetto("altezzaColmo", Number(e.target.value))}
+              />
+            </Domanda>
+          </div>
+        )}
       </div>
 
       {/* Una scheda per stanza */}
@@ -183,18 +319,36 @@ export default function AmbientiSemplici({ ambienti, onChange, comune }) {
                 aria-label="Nome della stanza"
                 onChange={(e) => set("nome", e.target.value)}
               />
-              {ambienti.length > 1 && (
+              {ambienti.length > 1 && !a.casaIntera && (
                 <button type="button" onClick={() => onChange(ambienti.filter((x) => x.id !== a.id))} className="text-sm text-slate-500 hover:text-red-600 px-2 py-1">
                   Togli
                 </button>
               )}
             </div>
 
-            <Domanda testo="Che stanza è?">
-              <Scelta piccolo opzioni={TIPI} valore={a.tipoLocale} onScegli={scegliTipo} />
-            </Domanda>
+            {!a.casaIntera && (
+              <Domanda testo="Che stanza è?">
+                <Scelta piccolo opzioni={TIPI} valore={a.tipoLocale} onScegli={scegliTipo} />
+              </Domanda>
+            )}
 
-            <Domanda testo="Quanto è grande? (metri)" errore={errori.lunghezzaM || errori.larghezzaM || errori.superficiePavimento}>
+            {a.casaIntera && (
+              <Domanda testo="Quanti metri quadri?" aiuto="Superficie calpestabile, dentro i muri. Se conosci lunghezza e larghezza della pianta, scrivile qui sotto: il calcolo è più preciso.">
+                <input
+                  type="number"
+                  step="1"
+                  min="0"
+                  className={`${inputCls} max-w-[10rem]`}
+                  value={Math.round(Number(a.superficiePavimento) || 0) || ""}
+                  onChange={(e) => {
+                    const lato = Math.round(Math.sqrt(Math.max(0, Number(e.target.value))) * 100) / 100;
+                    aggiorna(a.id, aggiornaCampoAmbiente(aggiornaCampoAmbiente(a, "lunghezzaM", lato), "larghezzaM", lato));
+                  }}
+                />
+              </Domanda>
+            )}
+
+            <Domanda testo={a.casaIntera ? "Lunghezza × larghezza della pianta (metri)" : "Quanto è grande? (metri)"} errore={errori.lunghezzaM || errori.larghezzaM || errori.superficiePavimento}>
               <div className="flex items-center gap-2 mt-1">
                 <input type="number" step="0.1" min="0" aria-label="Lunghezza" className={`${inputCls} mt-0 max-w-[7rem]`} value={a.lunghezzaM ?? ""} onChange={(e) => set("lunghezzaM", Number(e.target.value))} />
                 <span className="text-lg text-slate-500">×</span>
@@ -203,7 +357,7 @@ export default function AmbientiSemplici({ ambienti, onChange, comune }) {
               </div>
             </Domanda>
 
-            {duePiani && (
+            {duePiani && !a.casaIntera && (
               <Domanda testo="A che piano è?">
                 <Scelta
                   piccolo
@@ -217,7 +371,10 @@ export default function AmbientiSemplici({ ambienti, onChange, comune }) {
               </Domanda>
             )}
 
-            <Domanda testo="Quanti muri danno all'esterno?" aiuto="Conta i muri che hanno fuori l'aperto, non quelli verso un'altra stanza.">
+            <Domanda
+              testo="Quanti muri danno all'esterno?"
+              aiuto={a.casaIntera ? "Una casa indipendente di solito 4; un appartamento solo i lati che danno fuori." : "Conta i muri che hanno fuori l'aperto, non quelli verso un'altra stanza."}
+            >
               <Scelta
                 opzioni={MURI.map((m) => ({ value: m.value, label: String(m.n) }))}
                 valore={MURI.find((m) => m.n === MURI_DA_VALORE[a.paretiEsterne])?.value}
@@ -225,7 +382,7 @@ export default function AmbientiSemplici({ ambienti, onChange, comune }) {
               />
             </Domanda>
 
-            <Domanda testo="Quante finestre ci sono, e come sono?">
+            <Domanda testo={a.casaIntera ? "Quante finestre e portefinestre in tutto, e come sono quasi tutte?" : "Quante finestre ci sono, e come sono?"}>
               <div className="flex flex-wrap items-center gap-3 mt-1">
                 <div className="flex items-center gap-1">
                   <button type="button" aria-label="Una finestra in meno" className="w-10 h-10 rounded-lg border-2 border-slate-200 text-xl" onClick={() => set("numeroFinestre", Math.max(0, (a.numeroFinestre || 0) - 1))}>
@@ -243,7 +400,7 @@ export default function AmbientiSemplici({ ambienti, onChange, comune }) {
               {errori.superficieFinestre && <p className="text-sm text-red-600 mt-1">{errori.superficieFinestre}</p>}
             </Domanda>
 
-            <Domanda testo="Da che parte guardano le finestre?">
+            <Domanda testo={a.casaIntera ? "Da che parte guardano quasi tutte le finestre?" : "Da che parte guardano le finestre?"}>
               <Scelta piccolo opzioni={SOLE} valore={a.esposizionePrevalente} onScegli={(v) => set("esposizionePrevalente", v)} />
             </Domanda>
 
@@ -253,7 +410,7 @@ export default function AmbientiSemplici({ ambienti, onChange, comune }) {
 
             {calcolo && (
               <p className="text-base bg-slate-50 rounded-lg px-3 py-2">
-                Per questa stanza servono circa <strong>{formattaKw(calcolo.invernaleKw)}</strong> per scaldare e{" "}
+                {a.casaIntera ? (ambienti.length > 1 ? "Per questo piano servono circa" : "Servono circa") : "Per questa stanza servono circa"}{" "}<strong>{formattaKw(calcolo.invernaleKw)}</strong> per scaldare e{" "}
                 <strong>{formattaKw(calcolo.estivoKw)}</strong> per rinfrescare.
               </p>
             )}
@@ -261,9 +418,24 @@ export default function AmbientiSemplici({ ambienti, onChange, comune }) {
         );
       })}
 
+      {edificio && (
+        <div className="rounded-xl border-2 border-brand-200 bg-brand-50 p-4">
+          <p className="font-bold text-slate-800 text-lg">Tutta la casa</p>
+          <p className="text-base text-slate-800 mt-1">
+            {Math.round(superficieTotale)} m² · {Math.round(volumeTotale)} m³ da scaldare
+          </p>
+          <p className="text-base text-slate-800">
+            Servono circa <strong>{formattaKw(edificio.totaleInvernaleKw)}</strong> per scaldarla nel giorno più freddo e{" "}
+            <strong>{formattaKw(edificio.totaleEstivoKw)}</strong> per rinfrescarla nel giorno più caldo.
+          </p>
+        </div>
+      )}
+
+      {!intera && (
       <button type="button" onClick={aggiungi} className="w-full rounded-xl border-2 border-dashed border-slate-300 py-3 text-base font-semibold text-slate-600 hover:border-brand-400 hover:text-brand-700">
         + Aggiungi una stanza
       </button>
+      )}
       {!comune && <p className="text-sm text-amber-700">Scegli il comune qui sopra per vedere quanta potenza serve.</p>}
     </div>
   );
