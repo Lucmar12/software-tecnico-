@@ -18,13 +18,15 @@ export function validaAmbiente(ambiente) {
 
   if (!(ambiente.numeroFinestre >= 0)) errori.numeroFinestre = "Il numero di finestre non può essere negativo.";
 
-  if (!(ambiente.altezza >= 1 && ambiente.altezza <= 4.5)) {
+  // Fino a 8 m: saloni a doppia altezza e casali con soffitti alti
+  // esistono, e il calcolo per volume e superfici li tratta correttamente.
+  if (!(ambiente.altezza >= 1 && ambiente.altezza <= 8)) {
     errori.altezza =
       ambiente.soffitto === "dueFalde"
-        ? "L'altezza all'imposta deve essere compresa tra 1 e 4,5 m."
-        : "L'altezza interna deve essere compresa tra 2 e 4,5 m.";
+        ? "L'altezza all'imposta deve essere compresa tra 1 e 8 m."
+        : "L'altezza interna deve essere compresa tra 2 e 8 m.";
   } else if (ambiente.soffitto !== "dueFalde" && ambiente.altezza < 2) {
-    errori.altezza = "L'altezza interna deve essere compresa tra 2 e 4,5 m.";
+    errori.altezza = "L'altezza interna deve essere compresa tra 2 e 8 m.";
   }
 
   // Con il soffitto a falde l'imposta può scendere sotto i 2 m, ma il colmo
