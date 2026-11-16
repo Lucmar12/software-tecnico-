@@ -4,6 +4,7 @@ import TipoImpiantoSelector from "./components/TipoImpiantoSelector.jsx";
 import ComuneSelector from "./components/ComuneSelector.jsx";
 import ScenariTabs from "./components/ScenariTabs.jsx";
 import AmbientiEditor from "./components/AmbientiEditor.jsx";
+import AvvisoStima from "./components/AvvisoStima.jsx";
 import ACSForm from "./components/ACSForm.jsx";
 import TrattamentoAcqueForm from "./components/TrattamentoAcqueForm.jsx";
 import PompeIdraulicheForm from "./components/PompeIdraulicheForm.jsx";
@@ -279,6 +280,10 @@ export default function App() {
           <ProfiloProfessionistaPanel profilo={profilo} onChange={setProfilo} />
           <ProgettiPanel statoCorrente={statoCompleto} progettoAttivoId={progettoAttivoId} onCarica={caricaProgetto} onSalvatoConSuccesso={setProgettoAttivoId} />
           <StoricoRichieste />
+        </div>
+
+        <div className="no-print">
+          <AvvisoStima />
         </div>
 
         <section id="cosa-vuoi-dimensionare" className="bg-white border border-slate-200 rounded-xl p-4 space-y-3 no-print">

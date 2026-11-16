@@ -12,6 +12,7 @@ import {
 import { geometriaSoffitto } from "../utils/stime.js";
 import { OPZIONI_EPOCA } from "../utils/modelli.js";
 import { formattaKw } from "../utils/export.js";
+import AvvisoStima from "./AvvisoStima.jsx";
 
 const inputCls =
   "mt-1 w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400";
@@ -70,6 +71,7 @@ export function EsitoVerifica({ risultato, compatto = false }) {
         </div>
       )}
       {!compatto && <p className="text-xs opacity-90">{r.potenzaAcquaKw ? r.tipo.nota.replace(/: controlla sulla scheda la potenza resa all'acqua\./, ": la verifica usa la potenza resa all'acqua che hai indicato.") : r.tipo.nota}</p>}
+      <AvvisoStima compatto />
       {!compatto && r.modalita === "volume" && (
         <p className="text-xs opacity-80">
           Carico stimato su un edificio equivalente — pianta quadrata, vetrate al{" "}

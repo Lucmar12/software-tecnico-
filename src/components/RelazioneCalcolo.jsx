@@ -20,6 +20,7 @@ import { profiloCompilato } from "../utils/profiloProfessionista.js";
 import { EsitoVerifica } from "./VerificaPotenza.jsx";
 import { eseguiVerifica, modalitaEffettiva } from "../utils/verificaPotenza.js";
 import { frasiInBreve } from "../utils/inBreve.js";
+import AvvisoStima from "./AvvisoStima.jsx";
 import { calcolaBollitore, ZONE_CLIMATICHE } from "../data/calculations.js";
 import { trovaBollitoriConsigliati } from "../data/catalogo.js";
 import { stimaConsumoAnnuoClimatizzazione } from "../utils/fotovoltaico.js";
@@ -115,6 +116,7 @@ export default function RelazioneCalcolo({ scenari, scenarioProgetto, comune, ac
           ))}
         </section>
       )}
+      <AvvisoStima />
       {bloccoVerifica(true)}
       <RiepilogoSceltaProdotti
         voci={vociRiepilogo}

@@ -3,6 +3,7 @@ import { nuovoAmbiente, aggiornaCampoAmbiente, OPZIONI_EPOCA } from "../utils/mo
 import { validaAmbiente } from "../utils/validazione.js";
 import { calcolaAmbienteConOverride, calcolaEdificioConOverride } from "../utils/overrides.js";
 import { formattaKw } from "../utils/export.js";
+import AvvisoStima from "./AvvisoStima.jsx";
 
 /**
  * Le stanze raccontate con domande semplici, per chi non ha mai letto
@@ -428,6 +429,9 @@ export default function AmbientiSemplici({ ambienti, onChange, comune }) {
             Servono circa <strong>{formattaKw(edificio.totaleInvernaleKw)}</strong> per scaldarla nel giorno più freddo e{" "}
             <strong>{formattaKw(edificio.totaleEstivoKw)}</strong> per rinfrescarla nel giorno più caldo.
           </p>
+          <div className="mt-2">
+            <AvvisoStima compatto />
+          </div>
         </div>
       )}
 

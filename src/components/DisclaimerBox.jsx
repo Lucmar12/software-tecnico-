@@ -4,8 +4,15 @@ import React from "react";
 export default function DisclaimerBox() {
   return (
     <div className="bg-slate-100 border border-slate-200 rounded-xl p-4 text-xs text-slate-500 leading-relaxed">
-      <strong className="text-slate-600">Disclaimer tecnico.</strong> Il calcolo è stato eseguito secondo
-      metodologia UNI EN 12831 (carico invernale), metodo Carrier con dati climatici UNI 10339 (carico estivo),
+      <strong className="block text-sm text-slate-700 mb-2">
+        Avvertenza. Il presente documento riporta un dimensionamento di massima a carattere puramente indicativo,
+        ottenuto con metodi semplificati e parametri convenzionali. Non costituisce progetto termotecnico, non
+        sostituisce il calcolo di un professionista abilitato e non ha valore legale. Ogni scelta di acquisto e
+        installazione deve essere verificata da un tecnico abilitato; l'azienda declina ogni responsabilità per
+        decisioni assunte sulla sola base dei presenti risultati.
+      </strong>
+      <strong className="text-slate-600">Metodo.</strong> La stima si ispira, in forma semplificata, alla
+      metodologia UNI EN 12831 (carico invernale), al metodo Carrier con dati climatici UNI 10339 (carico estivo),
       UNI 9182 (fabbisogno ACS, reti di distribuzione idrica e dimensionamento di autoclavi/pompe di sollevamento e
       circolazione), UNI EN 14743 (requisiti prestazionali degli addolcitori a scambio ionico) e, per stufe e
       camini, UNI 10683 e UNI EN 13384-1, riportate come requisiti di installazione e non calcolate. Le temperature di
