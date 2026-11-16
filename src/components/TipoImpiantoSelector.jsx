@@ -7,7 +7,7 @@ import React from "react";
  * vengono mostrate, per mantenere il flusso pertinente ed evitare di
  * chiedere/mostrare dati non necessari.
  */
-const CHIAVI_TIPO_IMPIANTO = ["climatizzazione", "biomassa", "acs", "trattamentoAcque", "pompeIdrauliche"];
+const CHIAVI_TIPO_IMPIANTO = ["climatizzazione", "biomassa", "acs", "trattamentoAcque", "pompeIdrauliche", "verificaPotenza"];
 
 export default function TipoImpiantoSelector({ tipiImpianto, onChange }) {
   function toggle(chiave) {
@@ -53,6 +53,13 @@ export default function TipoImpiantoSelector({ tipiImpianto, onChange }) {
         titolo="Pompe idrauliche"
         descrizione="Autoclavi, pompe di sollevamento e circolazione — dimensionamento secondo UNI 9182"
         icona="🔧"
+      />
+      <Opzione
+        attivo={tipiImpianto.verificaPotenza}
+        onClick={() => toggle("verificaPotenza")}
+        titolo="Verifica una macchina"
+        descrizione="Hai già una potenza in mente o un'offerta da valutare? Scopri se basta per la casa e fino a quanti metri cubi"
+        icona="🔎"
       />
     </div>
   );

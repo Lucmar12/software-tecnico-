@@ -19,6 +19,8 @@ import BiomassaForm from "./components/BiomassaForm.jsx";
 import ProfiloProfessionistaPanel from "./components/ProfiloProfessionistaPanel.jsx";
 import { caricaProfilo } from "./utils/profiloProfessionista.js";
 import { nuovaBiomassa } from "./utils/biomassa.js";
+import VerificaPotenzaForm from "./components/VerificaPotenza.jsx";
+import { nuovaVerificaPotenza } from "./utils/verificaPotenza.js";
 import { BRANDING_FISSO } from "./utils/brandingFisso.js";
 import { nuovoScenario, nuovoTrattamentoAcque, nuovaPompeIdrauliche } from "./utils/modelli.js";
 import { ambienteValido } from "./utils/validazione.js";
@@ -28,7 +30,7 @@ import { caricaBozza, salvaBozza } from "./utils/persistenza.js";
 import { applicaStime } from "./utils/stime.js";
 
 const STATO_INIZIALE = {
-  tipiImpianto: { climatizzazione: true, biomassa: false, acs: true, trattamentoAcque: false, pompeIdrauliche: false },
+  tipiImpianto: { climatizzazione: true, biomassa: false, acs: true, trattamentoAcque: false, pompeIdrauliche: false, verificaPotenza: false },
   comune: null,
   scenari: [nuovoScenario("Stato di fatto")],
   scenarioAttivoId: null,
@@ -41,6 +43,7 @@ const STATO_INIZIALE = {
   trattamentoAcque: nuovoTrattamentoAcque(),
   pompeIdrauliche: nuovaPompeIdrauliche(),
   biomassa: nuovaBiomassa(),
+  verificaPotenza: nuovaVerificaPotenza(),
 };
 STATO_INIZIALE.scenarioAttivoId = STATO_INIZIALE.scenari[0].id;
 STATO_INIZIALE.scenarioProgettoId = STATO_INIZIALE.scenari[0].id;
@@ -68,6 +71,7 @@ function fondiConDefault(statoCaricato) {
     fotovoltaico: { ...STATO_INIZIALE.fotovoltaico, ...(statoCaricato.fotovoltaico || {}) },
     trattamentoAcque: { ...STATO_INIZIALE.trattamentoAcque, ...(statoCaricato.trattamentoAcque || {}) },
     biomassa: { ...STATO_INIZIALE.biomassa, ...(statoCaricato.biomassa || {}) },
+    verificaPotenza: { ...STATO_INIZIALE.verificaPotenza, ...(statoCaricato.verificaPotenza || {}) },
     pompeIdrauliche: {
       ...STATO_INIZIALE.pompeIdrauliche,
       ...(statoCaricato.pompeIdrauliche || {}),
@@ -123,6 +127,7 @@ export default function App() {
   const [trattamentoAcque, setTrattamentoAcque] = useState(iniziale.trattamentoAcque);
   const [pompeIdrauliche, setPompeIdrauliche] = useState(iniziale.pompeIdrauliche);
   const [biomassa, setBiomassa] = useState(iniziale.biomassa);
+  const [verificaPotenza, setVerificaPotenza] = useState(iniziale.verificaPotenza);
   const [progettoAttivoId, setProgettoAttivoId] = useState(null);
   // Dati di chi firma la relazione: del dispositivo, non del progetto, quindi
   // fuori da statoCompleto e dalla bozza.
@@ -141,13 +146,14 @@ export default function App() {
     trattamentoAcque,
     pompeIdrauliche,
     biomassa,
+    verificaPotenza,
   };
 
   // Bozza automatica: salvata ad ogni modifica di stato rilevante, ripristinata all'apertura dell'app.
   useEffect(() => {
     salvaBozza(statoCompleto);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tipiImpianto, comune, scenari, scenarioAttivoId, scenarioProgettoId, acs, sistemaCentralizzato, solareTermico, fotovoltaico, trattamentoAcque, pompeIdrauliche, biomassa]);
+  }, [tipiImpianto, comune, scenari, scenarioAttivoId, scenarioProgettoId, acs, sistemaCentralizzato, solareTermico, fotovoltaico, trattamentoAcque, pompeIdrauliche, biomassa, verificaPotenza]);
 
   function caricaProgetto(progettoSalvato) {
     const s = fondiConDefault(progettoSalvato.stato);
@@ -163,6 +169,7 @@ export default function App() {
     setTrattamentoAcque(s.trattamentoAcque);
     setPompeIdrauliche(s.pompeIdrauliche);
     setBiomassa(s.biomassa);
+    setVerificaPotenza(s.verificaPotenza);
     setProgettoAttivoId(progettoSalvato.id);
   }
 
@@ -184,11 +191,19 @@ export default function App() {
   // Comune e ambienti servono sia alla climatizzazione sia a stufe e camini:
   // entrambi partono dal carico invernale degli stessi locali.
   const servonoAmbienti = tipiImpianto.climatizzazione || tipiImpianto.biomassa;
+  // La verifica di una macchina ha bisogno del comune (temperatura di
+  // progetto) ma non degli ambienti: in modalità "da volume" se ne fa a meno.
+  const serveComune = servonoAmbienti || tipiImpianto.verificaPotenza;
+  const verificaPronta =
+    !tipiImpianto.verificaPotenza ||
+    (Boolean(comune) &&
+      verificaPotenza.potenzaKw > 0 &&
+      (verificaPotenza.modalita === "ambienti" && servonoAmbienti ? ambientiValidi : verificaPotenza.volumeM3 > 0 && verificaPotenza.altezzaM > 0));
   const climatizzazioneOk = !servonoAmbienti || (Boolean(comune) && ambientiValidi);
   const acsOk = !tipiImpianto.acs || acsValido;
   const trattamentoAcqueOk = !tipiImpianto.trattamentoAcque || trattamentoAcqueValido;
   const pompeIdraulicheOk = !tipiImpianto.pompeIdrauliche || pompeIdraulicheValide;
-  const pronto = climatizzazioneOk && acsOk && trattamentoAcqueOk && pompeIdraulicheOk;
+  const pronto = climatizzazioneOk && acsOk && trattamentoAcqueOk && pompeIdraulicheOk && verificaPronta;
 
   // Calcolo edificio per ogni scenario, quando serve il carico degli ambienti e il comune è selezionato.
   const scenariCalcolati = useMemo(() => {
@@ -216,10 +231,11 @@ export default function App() {
   // Numerazione dinamica delle sezioni di input, in base a cosa è effettivamente mostrato.
   let numeroSezione = 0;
   const prossimoNumero = () => ++numeroSezione;
-  const nComune = servonoAmbienti ? prossimoNumero() : null;
+  const nComune = serveComune ? prossimoNumero() : null;
   const nScenari = servonoAmbienti ? prossimoNumero() : null;
   const nAmbienti = servonoAmbienti ? prossimoNumero() : null;
   const nBiomassa = tipiImpianto.biomassa ? prossimoNumero() : null;
+  const nVerifica = tipiImpianto.verificaPotenza ? prossimoNumero() : null;
   const nAcs = tipiImpianto.acs ? prossimoNumero() : null;
   const nTrattamentoAcque = tipiImpianto.trattamentoAcque ? prossimoNumero() : null;
   const nPompeIdrauliche = tipiImpianto.pompeIdrauliche ? prossimoNumero() : null;
@@ -231,7 +247,8 @@ export default function App() {
    * metà del lavoro.
    */
   const mancanze = [
-    servonoAmbienti && !comune && { id: "sezione-comune", testo: "Seleziona il comune per ricavare i dati climatici di progetto" },
+    serveComune && !comune && { id: "sezione-comune", testo: "Seleziona il comune per ricavare i dati climatici di progetto" },
+    tipiImpianto.verificaPotenza && Boolean(comune) && !verificaPronta && { id: "sezione-verifica", testo: "Inserisci potenza e volume della macchina da verificare" },
     servonoAmbienti && Boolean(comune) && !ambientiValidi && { id: "sezione-ambienti", testo: "Completa correttamente almeno un ambiente" },
     tipiImpianto.acs && !acsOk && { id: "sezione-acs", testo: "Inserisci il numero di persone servite dall'acqua calda sanitaria" },
     tipiImpianto.trattamentoAcque && !trattamentoAcqueOk && { id: "sezione-trattamento-acque", testo: "Inserisci numero di persone e durezza dell'acqua per l'addolcitore" },
@@ -245,7 +262,12 @@ export default function App() {
   const mostraRisultati =
     pronto &&
     climatizzazionePronta &&
-    (tipiImpianto.climatizzazione || tipiImpianto.biomassa || tipiImpianto.acs || tipiImpianto.trattamentoAcque || tipiImpianto.pompeIdrauliche);
+    (tipiImpianto.climatizzazione ||
+      tipiImpianto.biomassa ||
+      tipiImpianto.acs ||
+      tipiImpianto.trattamentoAcque ||
+      tipiImpianto.pompeIdrauliche ||
+      tipiImpianto.verificaPotenza);
 
   return (
     <div className="min-h-screen">
@@ -273,7 +295,7 @@ export default function App() {
           />
         </section>
 
-        {servonoAmbienti ? (
+        {serveComune ? (
           <section id="sezione-comune" className="bg-white border border-slate-200 rounded-xl p-4 space-y-3 no-print">
             <StepHeader numero={nComune} titolo="Comune e dati climatici" />
             <ComuneSelector comuneEffettivo={comune} onChange={setComune} />
@@ -337,6 +359,19 @@ export default function App() {
               onChangeAmbienti={(ambienti) => aggiornaAmbientiScenario(scenarioAttivo.id, ambienti)}
               edificio={edificioAttivo}
               comune={comune}
+            />
+          </section>
+        )}
+
+        {tipiImpianto.verificaPotenza && (
+          <section id="sezione-verifica" className="space-y-3 no-print">
+            <StepHeader numero={nVerifica} titolo="Verifica una macchina" sottotitolo="dai la potenza, scopri se basta e fino a quanti metri cubi" />
+            <VerificaPotenzaForm
+              verifica={verificaPotenza}
+              onChange={setVerificaPotenza}
+              comune={comune}
+              edificio={edificioAttivo}
+              ambientiDisponibili={servonoAmbienti}
             />
           </section>
         )}
@@ -405,6 +440,7 @@ export default function App() {
                 trattamentoAcque={trattamentoAcque}
                 pompeIdrauliche={pompeIdrauliche}
                 biomassa={biomassa}
+                verificaPotenza={verificaPotenza}
                 profilo={profilo}
               />
             </div>

@@ -17,6 +17,8 @@ import RiepilogoSceltaProdotti from "./RiepilogoSceltaProdotti.jsx";
 import BiomassaDettaglio from "./BiomassaDettaglio.jsx";
 import { dimensionaBiomassa } from "../utils/biomassa.js";
 import { profiloCompilato } from "../utils/profiloProfessionista.js";
+import { EsitoVerifica } from "./VerificaPotenza.jsx";
+import { eseguiVerifica } from "../utils/verificaPotenza.js";
 import { calcolaBollitore, ZONE_CLIMATICHE } from "../data/calculations.js";
 import { trovaBollitoriConsigliati } from "../data/catalogo.js";
 import { stimaConsumoAnnuoClimatizzazione } from "../utils/fotovoltaico.js";
@@ -40,12 +42,13 @@ const EDIFICIO_VUOTO = {
  * preventivo in primo piano. Mostra solo i blocchi (climatizzazione, ACS,
  * trattamento acque, pompe idrauliche) effettivamente richiesti.
  */
-export default function RelazioneCalcolo({ scenari, scenarioProgetto, comune, acs, branding, tipiImpianto, sistemaCentralizzato, solareTermico, fotovoltaico, trattamentoAcque, pompeIdrauliche, biomassa, profilo = null }) {
+export default function RelazioneCalcolo({ scenari, scenarioProgetto, comune, acs, branding, tipiImpianto, sistemaCentralizzato, solareTermico, fotovoltaico, trattamentoAcque, pompeIdrauliche, biomassa, verificaPotenza = null, profilo = null }) {
   const mostraClima = tipiImpianto.climatizzazione;
   const mostraBiomassa = Boolean(tipiImpianto.biomassa && biomassa);
   // Il calcolo per ambiente serve a entrambe: la stufa parte dallo stesso
   // carico invernale dei climatizzatori.
   const mostraAmbienti = mostraClima || mostraBiomassa;
+  const mostraVerifica = Boolean(tipiImpianto.verificaPotenza && verificaPotenza);
   const mostraAcs = tipiImpianto.acs;
   const mostraTrattamentoAcque = tipiImpianto.trattamentoAcque;
   const mostraPompeIdrauliche = tipiImpianto.pompeIdrauliche;
@@ -69,12 +72,31 @@ export default function RelazioneCalcolo({ scenari, scenarioProgetto, comune, ac
     biomassa,
   });
 
+  // Verifica di una macchina: dagli ambienti se ci sono, altrimenti da volume.
+  const risultatoVerifica = mostraVerifica
+    ? eseguiVerifica({
+        verifica: { ...verificaPotenza, modalita: mostraAmbienti && scenarioDaPreventivare ? verificaPotenza.modalita : "volume" },
+        comune,
+        edificio: scenarioDaPreventivare?.edificio ?? null,
+      })
+    : null;
+  const bloccoVerifica = (compatto) =>
+    risultatoVerifica && (
+      <section className="space-y-2">
+        <h2 className="text-xl font-bold text-slate-800">
+          Verifica: {risultatoVerifica.tipo.etichetta.toLowerCase()} da {verificaPotenza.potenzaKw} kW
+        </h2>
+        <EsitoVerifica risultato={risultatoVerifica} compatto={compatto} />
+      </section>
+    );
+
   // Ogni scheda è un blocco di JSX: raggruppa le sezioni che rispondono
   // alla stessa domanda dell'utente, invece di srotolarle tutte in un
   // unico scorrimento in cui "quanto costa" e "come l'hai calcolato"
   // stanno alla stessa distanza.
   const schedaCosaTiServe = (
     <>
+      {bloccoVerifica(true)}
       <RiepilogoSceltaProdotti
         voci={vociRiepilogo}
         nomeScenario={mostraAmbienti && confrontoAttivo ? scenarioDaPreventivare?.nome : null}
@@ -166,6 +188,7 @@ export default function RelazioneCalcolo({ scenari, scenarioProgetto, comune, ac
 
   const schedaComeCalcolato = (
     <>
+      {bloccoVerifica(false)}
       {mostraAmbienti &&
         scenari.map((scenario) => {
           const mostraSplit = sistemaCentralizzato.tipo === "nessuno" || scenario.edificio.risultatiAmbienti.length < 2;

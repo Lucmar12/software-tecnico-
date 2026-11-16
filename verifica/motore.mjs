@@ -43,6 +43,7 @@ import {
 import { confrontaMonoMulti } from "../src/utils/confrontoMonoMulti.js";
 import { dimensionaBiomassa, ambientiServiti, descrizioneApparecchio, POTENZA_MINIMA_COMMERCIALE_KW } from "../src/utils/biomassa.js";
 import { oreEquivalentiRiscaldamento } from "../src/utils/fotovoltaico.js";
+import { edificioEquivalente, caricoDaVolume, verificaPotenza, eseguiVerifica, nuovaVerificaPotenza } from "../src/utils/verificaPotenza.js";
 import { MONOSPLIT_AUX, LIGHT_COMMERCIAL_AUX, UNITA_INTERNE_MULTI_AUX, UNITA_ESTERNE_MULTI_AUX, capacitaGarantita, prezzoSistema } from "../src/data/gammaAux.js";
 import { calcolaSuperficieMuriEsterni, sviluppoParetiEsterne, areaFinestra, normalizzaGeometria } from "../src/utils/stime.js";
 import { ORE_DI_CALCOLO, quotaIrraggiamento, temperaturaEsternaOraria, ESCURSIONE_DEFAULT_K } from "../src/utils/profiliOrari.js";
@@ -781,6 +782,74 @@ function ambienteRiferimento(extra = {}) {
   // --- Catalogo: nessun prodotto inventato, la ricerca va su richiesta ---
   const ricerca = trovaGeneratoriBiomassaConsigliati({ combustibile: "pellet", apparecchio: "stufa", distribuzione: "aria", potenzaMinimaKw: 6, potenzaMassimaKw: 7.5 });
   vero("stufe e camini: nessun prodotto proposto senza listino", ricerca.consigliati.length === 0 && ricerca.suRichiesta === true);
+}
+
+// ---------------------------------------------------------------------
+// CALCOLO INVERSO — data una potenza, basta per la casa?
+// ---------------------------------------------------------------------
+{
+  // --- Edificio equivalente, derivato a mano ---
+  // Appartamento a piano intermedio, 400 m³, altezza 2,50 m, 1991-2005:
+  //   superficie = 400 / 2,50 = 160 m², lato = √160 = 12,649 m
+  //   muri = 2 lati esposti × 12,649 × 2,50 = 63,246 m²
+  //   vetrate = 15% × 160 = 24 m² · muro netto = 39,246 m²
+  //   ΔT = 22 K · U muro 0,7 · U vetro 3,0 · esposizione est ×1,00 · piano intermedio ×1,00
+  //   Q_muri = 0,7 × 39,246 × 22 = 604,38 W · Q_vetri = 3,0 × 24 × 22 = 1.584 W
+  //   trasmissione = 2.188,38 × 1,10 (ponti termici) = 2.407,22 W
+  //   ventilazione = 0,34 × 0,5 × 400 × 22 = 1.496 W → carico 3.903,2 W
+  const app = caricoDaVolume({ volumeM3: 400, altezzaM: 2.5, tipoEdificio: "appartamentoIntermedio", epocaCostruttiva: "1991-2005", comune: COMUNE });
+  uguale("edificio equivalente: carico di un appartamento da 400 m³ [kW]", app.caricoKw, 3.90322, 0.001);
+  vero("appartamento intermedio: niente tetto né pavimento verso terra", app.ambienti.every((a) => !a.ultimoPiano && !a.pianoTerra));
+
+  // Il volume si conserva: superficie × altezza = volume dato. Entro 0,1 m³,
+  // perché la superficie di pavimento è arrotondata al centesimo di m²
+  // (500 m³ diventano 500,013): uno scarto dello 0,003%, irrilevante sul carico.
+  for (const tipo of ["casaDuePiani", "casaUnPiano", "appartamentoIntermedio", "appartamentoUltimo", "appartamentoTerra"]) {
+    const ambienti = edificioEquivalente({ volumeM3: 500, altezzaM: 2.7, tipoEdificio: tipo, epocaCostruttiva: "1976-1990" });
+    uguale(`${tipo}: il volume ricostruito è quello dato [m³]`, ambienti.reduce((t, a) => t + a.superficiePavimento * a.altezza, 0), 500, 0.1);
+  }
+  const casa = edificioEquivalente({ volumeM3: 500, tipoEdificio: "casaDuePiani" });
+  vero("casa su due piani: il piano terra disperde verso terra, l'ultimo verso il tetto", casa[0].pianoTerra && !casa[0].ultimoPiano && casa[1].ultimoPiano && !casa[1].pianoTerra);
+
+  // A parità di volume una casa indipendente disperde più di un appartamento,
+  // e una costruzione vecchia più di una recente.
+  const caricoDi = (tipoEdificio, epocaCostruttiva) => caricoDaVolume({ volumeM3: 500, altezzaM: 2.7, tipoEdificio, epocaCostruttiva, comune: COMUNE }).caricoKw;
+  vero("la casa indipendente chiede più dell'appartamento", caricoDi("casaDuePiani", "1976-1990") > caricoDi("appartamentoIntermedio", "1976-1990"));
+  const epoche = ["ante-1975", "1976-1990", "1991-2005", "2006-2015", "post-2015"];
+  vero("più vecchia la casa, più alto il carico", epoche.every((e, i) => i === 0 || caricoDi("casaDuePiani", e) < caricoDi("casaDuePiani", epoche[i - 1])));
+
+  // --- Esito ---
+  // pellet, margine 25%: 18/20 non basta, 24/20 = 120% va bene, 26/20 = 130% è troppo
+  ugualeTesto("18 kW su 20 non bastano", verificaPotenza({ potenzaKw: 18, caricoKw: 20, tipoGeneratore: "biomassa_idro_pellet", comune: COMUNE }).esito, "insufficiente");
+  ugualeTesto("24 kW su 20 col pellet sono adeguati", verificaPotenza({ potenzaKw: 24, caricoKw: 20, tipoGeneratore: "biomassa_idro_pellet", comune: COMUNE }).esito, "adeguata");
+  ugualeTesto("26 kW su 20 col pellet sono troppi", verificaPotenza({ potenzaKw: 26, caricoKw: 20, tipoGeneratore: "biomassa_idro_pellet", comune: COMUNE }).esito, "sovradimensionata");
+  // legna, margine 10%: già 23 su 20 (115%) è troppo
+  ugualeTesto("23 kW su 20 con la legna sono troppi", verificaPotenza({ potenzaKw: 23, caricoKw: 20, tipoGeneratore: "biomassa_idro_legna", comune: COMUNE }).esito, "sovradimensionata");
+  // la caldaia a condensazione modula: si verifica solo che basti
+  ugualeTesto("la caldaia non risulta mai sovradimensionata", verificaPotenza({ potenzaKw: 40, caricoKw: 20, tipoGeneratore: "caldaia", comune: COMUNE }).esito, "adeguata");
+
+  // La pompa di calore rende meno al freddo: a −2 °C il fattore interpolato è
+  // 0,65 + 3/7 × 0,20 = 0,7357, quindi 26 kW di catalogo sono 19,13 kW reali
+  // e su 20 kW di carico non bastano.
+  const pdc = verificaPotenza({ potenzaKw: 26, caricoKw: 20, tipoGeneratore: "pompa_di_calore", comune: COMUNE });
+  uguale("pompa di calore: potenza reale al giorno più freddo [kW]", pdc.potenzaEffettivaKw, 26 * (0.65 + (3 / 7) * 0.2), 1e-9);
+  ugualeTesto("pompa di calore: 26 kW di catalogo non coprono 20 kW a −2 °C", pdc.esito, "insufficiente");
+  vero("la stufa invece non perde potenza col freddo", verificaPotenza({ potenzaKw: 26, caricoKw: 20, tipoGeneratore: "biomassa_idro_pellet", comune: COMUNE }).fattoreDerating === 1);
+
+  // --- La domanda girata: fino a quanti metri cubi? ---
+  // 20 kW su 500 m³ = 40 W/m³ · 26 kW bastano fino a 26 / 0,040 = 650 m³
+  // e sono giusti (entro il 25%) da 26 / 1,25 / 0,040 = 520 m³
+  const giro = verificaPotenza({ potenzaKw: 26, caricoKw: 20, tipoGeneratore: "biomassa_idro_pellet", comune: COMUNE, volumeM3: 500 });
+  uguale("volume massimo servibile [m³]", giro.volumeMassimoM3, 650, 1e-9);
+  uguale("volume minimo per non essere sovradimensionata [m³]", giro.volumeIdealeMinimoM3, 520, 1e-9);
+
+  // --- Esecuzione dalla configurazione ---
+  vero("senza comune la verifica non parte", eseguiVerifica({ verifica: nuovaVerificaPotenza(), comune: null, edificio: null }) === null);
+  vero("'dagli ambienti' senza ambienti non parte", eseguiVerifica({ verifica: nuovaVerificaPotenza({ modalita: "ambienti" }), comune: COMUNE, edificio: null }) === null);
+  const edificioVero = calcolaEdificioConOverride([ambienteRiferimento()], COMUNE);
+  const daAmbienti = eseguiVerifica({ verifica: nuovaVerificaPotenza({ modalita: "ambienti", potenzaKw: 1 }), comune: COMUNE, edificio: edificioVero });
+  uguale("dagli ambienti usa il carico calcolato stanza per stanza [kW]", daAmbienti.caricoKw, edificioVero.totaleInvernaleKw, 1e-12);
+  uguale("e il volume vero degli ambienti [m³]", daAmbienti.volumeM3, 5 * 4 * 2.7, 1e-9);
 }
 
 // ---------------------------------------------------------------------
